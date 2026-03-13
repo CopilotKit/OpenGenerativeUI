@@ -540,9 +540,64 @@ body, html {
   display: none !important;
 }
 
-/* Hide default welcome message */
-[data-testid="copilot-welcome-screen"] [data-testid="copilot-welcome-message"] {
-  display: none !important;
+/* "Try these Prompts" label above suggestion pills */
+[data-testid="copilot-suggestions"] {
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+}
+
+[data-testid="copilot-suggestions"]::before {
+  content: "Try these Prompts";
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  margin-bottom: 2px;
+}
+
+/* === Explainer Cards === */
+.explainer-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 0 4px;
+  max-width: 820px;
+  margin: 4px auto 12px;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .explainer-cards {
+    grid-template-columns: 1fr;
+    padding: 0 8px;
+  }
+}
+
+.explainer-card {
+  background: var(--color-glass-subtle);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border-glass);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.explainer-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--color-lilac), var(--color-mint));
+  color: #fff;
+  flex-shrink: 0;
 }
 
 /* === Flash Animation === */
