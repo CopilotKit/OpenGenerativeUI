@@ -22,7 +22,7 @@ All visuals are rendered in sandboxed iframes with automatic light/dark theming,
 pnpm install
 
 # Add your OpenAI API key
-echo 'OPENAI_API_KEY=your-key' > apps/agent/.env
+echo 'OPENAI_API_KEY=your-key' > .env
 
 # Start all services
 pnpm dev
@@ -33,10 +33,9 @@ pnpm dev
 
 ## Run with Docker Compose
 
-```bash
-# Add your OpenAI API key at the repo root
-echo 'OPENAI_API_KEY=your-key' > .env
+With the repo-root `.env` file from Quick Start in place:
 
+```bash
 # Build and start the frontend + agent
 docker compose up --build
 ```
