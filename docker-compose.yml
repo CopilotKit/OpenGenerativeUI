@@ -1,0 +1,22 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/workspace/.env:ro
+    ports:
+      - "8123:8123"
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.app
+    environment:
+      LANGGRAPH_DEPLOYMENT_URL: http://agent:8123
+    depends_on:
+      - agent
+    ports:
+      - "3000:3000"
