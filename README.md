@@ -18,18 +18,29 @@ All visuals are rendered in sandboxed iframes with automatic light/dark theming,
 ## Quick Start
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Add your OpenAI API key
-echo 'OPENAI_API_KEY=your-key' > apps/agent/.env
-
-# Start all services
-pnpm dev
+make setup    # Install deps + create .env template
+# Edit apps/agent/.env with your real OpenAI API key
+make dev      # Start all services
 ```
 
 - **App**: http://localhost:3000
 - **Agent**: http://localhost:8123
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `make setup` | Install all dependencies and create `.env` template |
+| `make dev` | Start all services (frontend + agent + mcp) |
+| `make dev-app` | Start Next.js frontend only |
+| `make dev-agent` | Start LangGraph agent only |
+| `make dev-mcp` | Start MCP server only |
+| `make build` | Build all apps |
+| `make lint` | Lint all apps |
+| `make clean` | Clean build artifacts |
+| `make help` | Show all available commands |
+
+You can also use `pnpm` directly (`pnpm dev`, `pnpm dev:app`, `pnpm dev:agent`, etc.).
 
 ## Architecture
 
