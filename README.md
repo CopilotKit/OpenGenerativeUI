@@ -22,20 +22,37 @@ All visuals are rendered in sandboxed iframes with automatic light/dark theming,
 pnpm install
 
 # Add your OpenAI API key
-echo 'OPENAI_API_KEY=your-key' > apps/agent/.env
+echo 'OPENAI_API_KEY=your-key' > .env
 
 # Start all services
 pnpm dev
 ```
 
-- **App**: http://localhost:3000
-- **Agent**: http://localhost:8123
+- **App**: [http://localhost:3000](http://localhost:3000)
+- **Agent**: [http://localhost:8123](http://localhost:8123)
+
+## Run with Docker Compose
+
+With the repo-root `.env` file from Quick Start in place:
+
+```bash
+# Build and start the frontend + agent
+docker compose up --build
+```
+
+- **App**: [http://localhost:3000](http://localhost:3000)
+- **Agent**: [http://localhost:8123](http://localhost:8123)
+
+The Compose setup starts two services:
+
+- `app` — Next.js frontend, configured to reach the agent at `http://agent:8123`
+- `agent` — LangGraph Python agent, using the root `.env` file mounted read-only at `/workspace/.env`
 
 ## Architecture
 
 Turborepo monorepo with two apps:
 
-```
+```text
 apps/
 ├── app/       Next.js 16 frontend (CopilotKit v2, React 19, Tailwind 4)
 └── agent/     LangGraph Python agent (GPT-5.4, CopilotKit middleware)
