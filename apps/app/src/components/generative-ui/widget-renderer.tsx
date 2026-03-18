@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from "react";
 import { z } from "zod";
 
 // ─── Zod Schema (CopilotKit parameter contract) ─────────────────────
@@ -409,9 +409,16 @@ const LOADING_PHRASES = [
 
 function useLoadingPhrase(active: boolean) {
   const [index, setIndex] = useState(0);
+  const prevActiveRef = useRef<boolean | null>(null);
+  
   useEffect(() => {
+    // Reset index when active changes from false to true
+    if (active && !prevActiveRef.current) {
+      setIndex(0);
+    }
+    prevActiveRef.current = active;
+    
     if (!active) return;
-    setIndex(0);
     const interval = setInterval(() => {
       setIndex((i) => (i + 1) % LOADING_PHRASES.length);
     }, 1800);
@@ -421,7 +428,7 @@ function useLoadingPhrase(active: boolean) {
 }
 
 // ─── React Component ─────────────────────────────────────────────────
-export function WidgetRenderer({ title, description, html }: WidgetRendererProps) {
+export function WidgetRenderer({ title, _description, html }: WidgetRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -449,7 +456,8 @@ export function WidgetRenderer({ title, description, html }: WidgetRendererProps
   // iframe only reloads when the html *content* truly changes, preserving
   // internal JS state (Three.js scenes, step counters, etc.) across
   // CopilotKit re-renders.
-  useEffect(() => {
+  // Use useLayoutEffect since we're synchronously modifying DOM
+  useLayoutEffect(() => {
     if (!html || !iframeRef.current) return;
     if (html === committedHtmlRef.current) return;
     committedHtmlRef.current = html;
