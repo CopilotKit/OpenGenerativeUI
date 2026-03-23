@@ -1,0 +1,164 @@
+# Excalidraw Diagram Skill
+
+Create clean, simple Excalidraw diagrams with progressive camera reveals. Use this skill when a user asks to diagram, visualize, flowchart, or illustrate anything.
+
+---
+
+## Step 1 — Always call read_me first
+
+Before creating any elements, call `Excalidraw:read_me()` to get the color palette, camera sizes, and element syntax. Then proceed directly to `Excalidraw:create_view`.
+
+---
+
+## Step 2 — Planning (critical for spacing)
+
+Before writing elements:
+
+1. **Sketch zones/layers** — What are the main sections? (Frontend/Backend, Input/Process/Output, etc.)
+2. **Assign colors** — One color per zone, used consistently
+3. **Plan camera positions** — 3–6 stops for the reveal effect
+4. **Plan spacing** — Draw it on paper first. Leave **minimum 60px vertical gaps** between rows, **40px horizontal gaps** between columns
+
+---
+
+## Step 3 — Core rules (MUST follow)
+
+### Camera
+- Start with `cameraUpdate` as the **first element**
+- Use exact 4:3 ratios: `400x300`, `600x450`, `800x600`, `1200x900`, `1600x1200`
+- Pan to each section as you draw it
+- End with a wide view showing the full diagram
+
+### Spacing (prevent overlaps)
+- **Minimum vertical gap between rows: 60px**
+- **Minimum horizontal gap between columns: 40px**
+- Check all y-coordinates: if row 1 ends at y=180, row 2 starts at y=240 or later
+- Zone label at top-left (y+8px from zone top), nodes start 40px below label
+- Never place text directly on shape edges — add 8–10px padding
+
+### Color grammar
+| Zone | Fill | Stroke |
+|------|------|--------|
+| UI / Frontend | `#dbe4ff` | `#4a9eed` |
+| Logic / Agent | `#e5dbff` | `#8b5cf6` |
+| Data / Storage | `#d3f9d8` | `#22c55e` |
+| External / API | `#ffd8a8` | `#f59e0b` |
+| Error / Alert | `#ffc9c9` | `#ef4444` |
+| Notes | `#fff3bf` | `#f59e0b` |
+
+### Typography
+- Title: `fontSize: 28`, `strokeColor: "#1e1e1e"`
+- Labels: `fontSize: 16–18` via `label` property
+- **Never use fontSize below 14**
+- Minimum text color: `#757575` (never light gray on white)
+
+### Drawing order (z-order)
+Per section, emit in this order:
+1. Zone background rectangle (sits behind)
+2. Zone label text
+3. Node shapes (with labels)
+4. Arrows between nodes
+
+**Never dump all rectangles first, then all text.**
+
+### Shapes
+- Use `label: { "text": "...", "fontSize": 16 }` on shapes — no separate text elements
+- Minimum size: `120x60` for labeled boxes
+- Add `roundness: { type: 3 }` for rounded corners
+
+### Arrows
+- Include `endArrowhead: "arrow"` for direction
+- Use `strokeStyle: "dashed"` for responses/optional paths
+- Keep labels **under 15 characters** or omit
+- Use `startBinding` / `endBinding` with `fixedPoint` to attach cleanly
+
+---
+
+## Step 4 — Diagram type patterns
+
+**Architecture** — Zones as swim lanes (left-to-right). Arrows show data flow.
+
+**Sequence** — Actors as header boxes with lifelines. Horizontal arrows = messages. Pan down as flow progresses.
+
+**Process/Flowchart** — Top-to-bottom. Diamonds for decisions, rectangles for steps. Color-code by stage.
+
+**Concept** — Start zoomed on title, reveal parts progressively. Use annotation boxes as callouts.
+
+---
+
+## Step 5 — The reveal animation
+
+Draw section by section with camera moves:
+
+```json
+// 1. Title, zoomed
+{"type":"cameraUpdate","width":600,"height":450,"x":100,"y":0},
+{"type":"text","id":"t1","x":200,"y":20,"text":"My Diagram","fontSize":28},
+
+// 2. Pan to zone 1, draw it
+{"type":"cameraUpdate","width":400,"height":300,"x":20,"y":60},
+{"type":"rectangle","id":"zone1","x":20,"y":80,"width":220,"height":380, ...},
+{"type":"rectangle","id":"node1","x":60,"y":130, ...},
+
+// 3. Pan to zone 2
+{"type":"cameraUpdate","width":400,"height":300,"x":280,"y":60},
+{"type":"rectangle","id":"node2","x":320,"y":130, ...},
+
+// 4. Draw arrows
+{"type":"cameraUpdate","width":800,"height":600,"x":0,"y":40},
+{"type":"arrow","id":"a1", ...},
+
+// 5. Final wide view
+{"type":"cameraUpdate","width":1200,"height":900,"x":-20,"y":-10}
+```
+
+---
+
+## Step 6 — Overlap prevention checklist
+
+- [ ] All shapes have **at least 60px vertical separation**
+- [ ] Zone labels don't overlap with nodes (40px minimum gap below label)
+- [ ] Arrows don't cross unrelated zones
+- [ ] Text is 8–10px inside shape bounds (not on edges)
+- [ ] Zone backgrounds are drawn BEFORE nodes
+- [ ] Arrows drawn AFTER both source and target
+- [ ] No shape dimensions smaller than `100x50`
+- [ ] All camera sizes are valid 4:3 ratios
+- [ ] Final element is a wide cameraUpdate
+- [ ] Minimum 3 camera positions for animation
+
+---
+
+## Step 7 — Common mistakes
+
+- **Overlapping text** — Check y-coordinates strictly; use 60px gaps minimum
+- **No cameraUpdate first** — Elements clip and look wrong
+- **All elements at once** — Loses the animation; use multiple camerUpdates
+- **Long arrow labels** — Overflow; keep under 15 chars
+- **Light text on white** — Use `#757575` minimum
+- **Zone label covered by nodes** — Put label 8px from zone top, nodes 40px below
+- **Shapes touching edges** — Leave padding; awkward layout
+
+---
+
+## Reference: Snippets
+
+**Zone background:**
+```json
+{"type":"rectangle","id":"z1","x":20,"y":80,"width":220,"height":380,"backgroundColor":"#dbe4ff","fillStyle":"solid","roundness":{"type":3},"strokeColor":"#4a9eed","strokeWidth":1,"opacity":40}
+```
+
+**Node:**
+```json
+{"type":"rectangle","id":"n1","x":60,"y":130,"width":150,"height":55,"backgroundColor":"#a5d8ff","fillStyle":"solid","roundness":{"type":3},"strokeColor":"#4a9eed","strokeWidth":2,"label":{"text":"API","fontSize":16}}
+```
+
+**Arrow:**
+```json
+{"type":"arrow","id":"a1","x":210,"y":157,"width":100,"height":0,"points":[[0,0],[100,0]],"strokeColor":"#1e1e1e","strokeWidth":2,"endArrowhead":"arrow","startBinding":{"elementId":"n1","fixedPoint":[1,0.5]},"endBinding":{"elementId":"n2","fixedPoint":[0,0.5]}}
+```
+
+**Annotation:**
+```json
+{"type":"rectangle","id":"note1","x":80,"y":200,"width":200,"height":36,"backgroundColor":"#fff3bf","fillStyle":"solid","roundness":{"type":3},"strokeColor":"#f59e0b","strokeWidth":1,"opacity":80,"label":{"text":"Note here","fontSize":14}}
+```

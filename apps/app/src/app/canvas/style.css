@@ -1,0 +1,142 @@
+/* Tiptap Editor Base */
+.tiptap :first-child {
+  margin-top: 0;
+}
+
+.tiptap ul,
+.tiptap ol {
+  padding: 0 1rem;
+  margin: 1.25rem 1rem 1.25rem 0.4rem;
+}
+
+.tiptap ul li p,
+.tiptap ol li p {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.tiptap h1,
+.tiptap h2,
+.tiptap h3,
+.tiptap h4,
+.tiptap h5,
+.tiptap h6 {
+  line-height: 1.1;
+  margin-top: 3.5rem;
+  margin-bottom: 1.5rem;
+  text-wrap: pretty;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.tiptap p {
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.tiptap h1 {
+  font-size: 1.4rem;
+}
+.tiptap h2 {
+  font-size: 1.2rem;
+}
+.tiptap h3 {
+  font-size: 1.1rem;
+}
+.tiptap h4,
+.tiptap h5,
+.tiptap h6 {
+  font-size: 1rem;
+}
+
+.tiptap code {
+  background-color: var(--surface-quaternary);
+  border-radius: 0.4rem;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  padding: 0.25em 0.3em;
+}
+
+.tiptap pre {
+  background: var(--text-primary);
+  border-radius: 0.5rem;
+  color: var(--surface-primary);
+  font-family: "Menlo", "Monaco", monospace;
+  margin: 1.5rem 0;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+}
+
+.tiptap pre code {
+  background: none;
+  color: inherit;
+  font-size: 0.8rem;
+  padding: 0;
+}
+
+.tiptap blockquote {
+  border-left: 3px solid var(--border-light);
+  margin: 1.5rem 0;
+  padding-left: 1rem;
+  color: var(--text-secondary);
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 1px solid var(--border-light);
+  margin: 2rem 0;
+}
+
+/* Diff highlights */
+.tiptap s {
+  background-color: rgba(249, 129, 129, 0.3);
+  padding: 2px;
+  text-decoration: line-through;
+}
+
+.tiptap em {
+  background-color: rgba(178, 242, 187, 1);
+  padding: 2px;
+  font-style: normal;
+}
+
+/* Editor focus and interaction states */
+.tiptap {
+  outline: none;
+  cursor: text;
+}
+
+.tiptap:focus,
+.tiptap:focus-visible {
+  outline: none;
+}
+
+/* Tiptap container styling */
+.ProseMirror {
+  outline: none;
+  cursor: text;
+  min-height: 100%;
+}
+
+.ProseMirror:focus,
+.ProseMirror:focus-visible {
+  outline: none;
+}
+
+/* Streaming animation for active generation */
+@keyframes streamingGlow {
+  0% {
+    box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.3), 0 0 20px rgba(139, 92, 246, 0.1);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.6), 0 0 30px rgba(139, 92, 246, 0.2);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.3), 0 0 20px rgba(139, 92, 246, 0.1);
+  }
+}
+
+.editor-streaming {
+  animation: streamingGlow 2s ease-in-out infinite;
+  border-radius: 0.5rem;
+}

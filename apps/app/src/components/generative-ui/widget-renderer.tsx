@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 import { z } from "zod";
 
 // ─── Zod Schema (CopilotKit parameter contract) ─────────────────────
@@ -228,6 +228,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+#content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 button {
   font-family: inherit;
   font-size: 14px;
@@ -358,6 +364,17 @@ window.addEventListener('load', reportHeight);
 // Periodic reports during initial load
 var _resizeInterval = setInterval(reportHeight, 200);
 setTimeout(function() { clearInterval(_resizeInterval); }, 15000);
+
+// Patch: receive incremental HTML updates without full reload
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'update-content' && typeof e.data.html === 'string') {
+    var content = document.getElementById('content');
+    if (content) {
+      content.innerHTML = e.data.html;
+      reportHeight();
+    }
+  }
+});
 `;
 
 // ─── Document Assembly ───────────────────────────────────────────────
@@ -425,8 +442,10 @@ export function WidgetRenderer({ title, description, html }: WidgetRendererProps
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   // Track what html has been committed to the iframe to avoid redundant reloads
   const committedHtmlRef = useRef("");
+  const isFirstRenderRef = useRef(true);
 
   const handleMessage = useCallback((e: MessageEvent) => {
     // Only handle messages from our own iframe
@@ -436,7 +455,7 @@ export function WidgetRenderer({ title, description, html }: WidgetRendererProps
       e.data?.type === "widget-resize" &&
       typeof e.data.height === "number"
     ) {
-      setHeight(Math.max(50, Math.min(e.data.height + 8, 4000)));
+      setHeight(Math.max(50, Math.min(e.data.height + 8, 800)));
     }
   }, []);
 
@@ -445,18 +464,36 @@ export function WidgetRenderer({ title, description, html }: WidgetRendererProps
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
 
-  // Write to iframe imperatively — bypasses React reconciliation so the
-  // iframe only reloads when the html *content* truly changes, preserving
-  // internal JS state (Three.js scenes, step counters, etc.) across
-  // CopilotKit re-renders.
-  useEffect(() => {
+  // Write to iframe imperatively — first render sets srcdoc (executes scripts),
+  // subsequent streaming updates patch #content.innerHTML via postMessage
+  // to preserve JS state (Three.js scenes, step counters, etc.).
+  useLayoutEffect(() => {
     if (!html || !iframeRef.current) return;
     if (html === committedHtmlRef.current) return;
     committedHtmlRef.current = html;
-    iframeRef.current.srcdoc = assembleDocument(html);
-    setLoaded(false);
-    setHeight(0);
+
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      iframeRef.current.srcdoc = assembleDocument(html);
+      setLoaded(false);
+      setHeight(0);
+    } else {
+      iframeRef.current.contentWindow?.postMessage(
+        { type: "update-content", html },
+        "*"
+      );
+    }
   }, [html]);
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Fallback: if iframe has html but hasn't reported ready after 4s, force-show
   useEffect(() => {
@@ -474,65 +511,110 @@ export function WidgetRenderer({ title, description, html }: WidgetRendererProps
   const loadingPhrase = useLoadingPhrase(showLoading);
 
   return (
-    <div className="w-full my-3">
-      {/* Loading indicator: visible until iframe is fully ready */}
-      {showLoading && (
+    <>
+      {/* Fullscreen backdrop */}
+      {isFullscreen && (
         <div
-          className="overflow-hidden rounded-xl"
           style={{
-            border: "1px solid var(--color-border-glass)",
-            background: "var(--surface-primary)",
+            position: "fixed",
+            inset: 0,
+            zIndex: 9998,
+            background: "rgba(0, 0, 0, 0.5)",
           }}
-        >
-          {/* Animated gradient border top */}
+          onClick={() => setIsFullscreen(false)}
+        />
+      )}
+      <div
+        className={isFullscreen ? undefined : "w-full my-3"}
+        style={isFullscreen ? {
+          position: "fixed",
+          top: "10%",
+          left: "12.5%",
+          width: "75%",
+          height: "80%",
+          zIndex: 9999,
+          background: "var(--background, #fff)",
+          borderRadius: 16,
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        } : undefined}
+      >
+        {/* Toolbar */}
+        {html && (
+          <div style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            padding: isFullscreen ? "8px 16px" : "0 0 4px 0",
+            ...(isFullscreen ? { borderBottom: "1px solid var(--border-secondary, #e5e7eb)" } : {}),
+          }}>
+            <button
+              onClick={() => setIsFullscreen(v => !v)}
+              style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px 8px", color: "var(--text-secondary, #6b7280)", fontSize: 13, fontFamily: "inherit" }}
+            >
+              {isFullscreen ? "✕ Close" : "⤢ Expand"}
+            </button>
+          </div>
+        )}
+        {/* Loading indicator: visible until iframe is fully ready */}
+        {showLoading && !isFullscreen && (
           <div
+            className="overflow-hidden rounded-xl"
             style={{
-              height: 2,
-              background: "linear-gradient(90deg, var(--color-lilac), var(--color-mint), var(--color-lilac))",
-              backgroundSize: "200% 100%",
-              animation: "shimmer 1.5s ease-in-out infinite",
+              border: "1px solid var(--color-border-glass)",
+              background: "var(--surface-primary)",
             }}
-          />
-          <div className="flex items-center gap-3 px-4 py-3">
-            {/* Spinning icon */}
+          >
             <div
               style={{
-                width: 18,
-                height: 18,
-                borderRadius: "50%",
-                border: "2px solid var(--color-border-light)",
-                borderTopColor: "var(--color-lilac-dark)",
-                animation: "spin 0.8s linear infinite",
-                flexShrink: 0,
+                height: 2,
+                background: "linear-gradient(90deg, var(--color-lilac), var(--color-mint), var(--color-lilac))",
+                backgroundSize: "200% 100%",
+                animation: "shimmer 1.5s ease-in-out infinite",
               }}
             />
-            <span
-              className="text-[13px] font-medium"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {loadingPhrase}...
-            </span>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  border: "2px solid var(--color-border-light)",
+                  borderTopColor: "var(--color-lilac-dark)",
+                  animation: "spin 0.8s linear infinite",
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                className="text-[13px] font-medium"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {loadingPhrase}...
+              </span>
+            </div>
           </div>
-        </div>
-      )}
-      {/* Iframe: always mounted so ref is stable; srcdoc set imperatively.
-          No srcDoc React prop — prevents React from reloading the iframe
-          on parent re-renders. */}
-      <iframe
-        ref={iframeRef}
-        sandbox="allow-scripts allow-same-origin"
-        className="w-full border-0"
-        onLoad={() => setLoaded(true)}
-        style={{
-          height: ready ? height : 0,
-          overflow: "hidden",
-          background: "transparent",
-          opacity: ready ? 1 : 0,
-          transition: "opacity 300ms ease-in",
-          display: html ? undefined : "none",
-        }}
-        title={title}
-      />
-    </div>
+        )}
+        {/* Single iframe — always mounted so ref is stable */}
+        <iframe
+          ref={iframeRef}
+          sandbox="allow-scripts allow-same-origin"
+          className="w-full border-0"
+          onLoad={() => setLoaded(true)}
+          style={{
+            height: isFullscreen ? undefined : (ready ? height : 0),
+            flex: isFullscreen ? 1 : undefined,
+            overflow: "hidden",
+            background: "transparent",
+            opacity: ready ? 1 : 0,
+            transition: "opacity 300ms ease-in",
+            display: html ? undefined : "none",
+          }}
+          title={title}
+        />
+      </div>
+    </>
+
   );
 }

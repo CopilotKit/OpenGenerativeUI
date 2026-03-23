@@ -2,7 +2,7 @@ from langchain.agents import AgentState as BaseAgentState
 from langchain.tools import ToolRuntime, tool
 from langchain.messages import ToolMessage
 from langgraph.types import Command
-from typing import TypedDict, Literal
+from typing import TypedDict, Literal, Optional
 import uuid
 
 class Todo(TypedDict):
@@ -14,6 +14,7 @@ class Todo(TypedDict):
 
 class AgentState(BaseAgentState):
     todos: list[Todo]
+    document: Optional[str] = None
 
 @tool
 def manage_todos(todos: list[Todo], runtime: ToolRuntime) -> Command:
