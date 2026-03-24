@@ -366,8 +366,8 @@ window.addEventListener('message', function(e) {
       // Execute only new scripts (not previously executed)
       incomingScripts.forEach(function(scriptInfo) {
         var key = scriptInfo.src || scriptInfo.text;
-        if (content.getAttribute('data-exec-' + btoa(key).slice(0, 16))) return;
-        content.setAttribute('data-exec-' + btoa(key).slice(0, 16), '1');
+        if (content.getAttribute('data-exec-' + btoa(key))) return;
+        content.setAttribute('data-exec-' + btoa(key), '1');
         var newScript = document.createElement('script');
         if (scriptInfo.src) {
           newScript.src = scriptInfo.src;
