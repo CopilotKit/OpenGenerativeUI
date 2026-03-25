@@ -30,8 +30,11 @@ make dev      # Start all services
 > | `gpt-5.4` / `gpt-5.4-pro` | OpenAI |
 > | `claude-opus-4-6` | Anthropic |
 > | `gemini-3.1-pro` | Google |
+> | `MiniMax-M2.7` / `MiniMax-M2.7-highspeed` | [MiniMax](https://www.minimaxi.com) |
 >
 > Smaller or weaker models will produce broken layouts, missing interactivity, or incomplete visualizations.
+>
+> **Using MiniMax:** Set `MINIMAX_API_KEY` in your `.env` — the provider is auto-detected. Defaults to `MiniMax-M2.7` (1M context window). See [MiniMax docs](https://www.minimaxi.com/document/introduction) for API keys.
 
 - **App**: http://localhost:3000
 - **Agent**: http://localhost:8123
