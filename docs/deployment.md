@@ -88,6 +88,55 @@ Requirements:
 | Agent | `GET /health` | `{"status": "ok"}` |
 | Frontend | `GET /api/health` | 200 OK |
 
+## LangGraph Platform (LangSmith Cloud)
+
+The agent can be deployed as a managed service on [LangGraph Platform](https://docs.smith.langchain.com/langgraph-platform/deployment) for built-in tracing, streaming, and persistence.
+
+### Prerequisites
+
+- A [LangSmith](https://smith.langchain.com) account (Plus plan or higher)
+- LangSmith API key
+- The `langgraph` CLI: `pip install langgraph-cli`
+
+### Deploy
+
+1. Connect your GitHub repo to LangSmith via **Deployments > + New Deployment**
+2. Set the root directory to `apps/agent`
+3. Configure environment variables in the LangSmith dashboard:
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `OPENAI_API_KEY` | Yes | Your OpenAI API key |
+| `LANGGRAPH_CLOUD` | Yes | Set to `true` — enables platform-native checkpointer |
+| `LLM_MODEL` | No | Defaults to `gpt-5.4-2026-03-05` |
+| `LANGCHAIN_TRACING_V2` | No | Set to `true` for built-in tracing |
+| `LANGCHAIN_PROJECT` | No | Project name for organizing traces |
+
+4. Note the deployment URL (e.g., `https://<id>.default.us.langgraph.app`)
+
+### Connect the Frontend
+
+Set `LANGGRAPH_DEPLOYMENT_URL` and `LANGSMITH_API_KEY` on your frontend:
+
+```bash
+LANGGRAPH_DEPLOYMENT_URL=https://<id>.default.us.langgraph.app \
+LANGSMITH_API_KEY=lsv2_... \
+pnpm --filter @repo/app start
+```
+
+The frontend automatically sends `x-api-key` headers when `LANGSMITH_API_KEY` is set.
+
+### Self-Hosted vs. LangGraph Platform
+
+| Concern | Self-Hosted (Render) | LangGraph Platform |
+|---------|---------------------|--------------------|
+| Checkpointer | BoundedMemorySaver (in-memory) | Managed Postgres (automatic) |
+| HTTP serving | FastAPI + uvicorn | Platform-managed |
+| Health checks | `/health` endpoint | Platform-managed |
+| Tracing | Optional (LANGSMITH_API_KEY) | Built-in |
+| Scaling | render.yaml config | Platform-managed |
+| Auth | None (private network) | LANGSMITH_API_KEY required |
+
 ## Docker
 
 A Dockerfile for the frontend is available at `docker/Dockerfile.app`. The agent can be containerized with a standard Python Dockerfile using `uv`.

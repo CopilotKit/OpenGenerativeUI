@@ -46,6 +46,9 @@ const deploymentUrl = !raw
 // 1. Define the agent connection to LangGraph
 const defaultAgent = new LangGraphHttpAgent({
   url: deploymentUrl,
+  ...(process.env.LANGSMITH_API_KEY && {
+    headers: { "x-api-key": process.env.LANGSMITH_API_KEY },
+  }),
 });
 
 // 3. Define the route and CopilotRuntime for the agent

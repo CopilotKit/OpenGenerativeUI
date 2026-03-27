@@ -22,13 +22,18 @@ from src.plan import plan_visualization
 
 load_dotenv()
 
+# LangGraph Platform provides a managed Postgres-backed checkpointer,
+# so BoundedMemorySaver is only needed for self-hosted / local dev.
+_on_langgraph_platform = bool(os.environ.get("LANGGRAPH_CLOUD"))
+checkpointer = None if _on_langgraph_platform else BoundedMemorySaver(max_threads=200)
+
 agent = create_deep_agent(
     model=ChatOpenAI(model=os.environ.get("LLM_MODEL", "gpt-5.4-2026-03-05")),
     tools=[query_data, plan_visualization, *todo_tools, generate_form],
     middleware=[CopilotKitMiddleware()],
     context_schema=AgentState,
     skills=[str(Path(__file__).parent / "skills")],
-    checkpointer=BoundedMemorySaver(max_threads=200),
+    checkpointer=checkpointer,
     system_prompt="""
         You are a helpful assistant that helps users understand CopilotKit and LangGraph used together.
 
