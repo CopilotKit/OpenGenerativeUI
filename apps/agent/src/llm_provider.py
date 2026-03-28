@@ -34,16 +34,30 @@ PROVIDER_PRESETS = {
 _CLAMP_TEMPERATURE_PROVIDERS = {"minimax"}
 
 
-def _detect_provider() -> str:
-    """Auto-detect provider from environment variables."""
+def _detect_provider() -> tuple[str, bool]:
+    """Auto-detect provider from environment variables.
+
+    Returns:
+        A tuple of (provider_name, explicitly_set) where *explicitly_set* is
+        ``True`` when ``LLM_PROVIDER`` was provided by the user.
+
+    Raises:
+        ValueError: If ``LLM_PROVIDER`` is set to an unrecognized value.
+    """
     explicit = os.environ.get("LLM_PROVIDER", "").strip().lower()
     if explicit:
-        return explicit
+        if explicit not in PROVIDER_PRESETS:
+            supported = ", ".join(sorted(PROVIDER_PRESETS.keys()))
+            raise ValueError(
+                f"Unsupported LLM_PROVIDER={explicit!r}. "
+                f"Supported providers: {supported}"
+            )
+        return explicit, True
 
     if os.environ.get("MINIMAX_API_KEY"):
-        return "minimax"
+        return "minimax", False
 
-    return "openai"
+    return "openai", False
 
 
 def create_llm() -> ChatOpenAI:
@@ -58,15 +72,25 @@ def create_llm() -> ChatOpenAI:
         OPENAI_API_KEY  – OpenAI API key
         MINIMAX_API_KEY – MiniMax API key
     """
-    provider = _detect_provider()
+    provider, explicitly_set = _detect_provider()
     preset = PROVIDER_PRESETS.get(provider, {})
 
     model = os.environ.get("LLM_MODEL") or preset.get("default_model") or "gpt-5.4-2026-03-05"
     base_url = os.environ.get("LLM_BASE_URL") or preset.get("base_url")
 
-    # Resolve API key
+    # Resolve API key – only fall back to OPENAI_API_KEY when the provider
+    # was auto-detected (not explicitly requested) or *is* openai.
     api_key_env = preset.get("api_key_env", "OPENAI_API_KEY")
-    api_key = os.environ.get(api_key_env) or os.environ.get("OPENAI_API_KEY", "")
+    api_key = os.environ.get(api_key_env)
+
+    if not api_key:
+        if explicitly_set and provider != "openai":
+            raise ValueError(
+                f"LLM_PROVIDER={provider!r} requires the {api_key_env} "
+                f"environment variable to be set."
+            )
+        # Auto-detected or openai provider: fall back to OPENAI_API_KEY
+        api_key = os.environ.get("OPENAI_API_KEY", "")
 
     # Parse temperature
     temperature = float(os.environ.get("LLM_TEMPERATURE", "0.7"))

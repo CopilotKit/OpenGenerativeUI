@@ -18,27 +18,39 @@ class TestDetectProvider:
 
     @patch.dict(os.environ, {}, clear=True)
     def test_defaults_to_openai(self):
-        assert _detect_provider() == "openai"
+        provider, explicitly_set = _detect_provider()
+        assert provider == "openai"
+        assert explicitly_set is False
 
     @patch.dict(os.environ, {"LLM_PROVIDER": "minimax"}, clear=True)
     def test_explicit_provider_minimax(self):
-        assert _detect_provider() == "minimax"
+        provider, explicitly_set = _detect_provider()
+        assert provider == "minimax"
+        assert explicitly_set is True
 
     @patch.dict(os.environ, {"LLM_PROVIDER": "openai"}, clear=True)
     def test_explicit_provider_openai(self):
-        assert _detect_provider() == "openai"
+        provider, explicitly_set = _detect_provider()
+        assert provider == "openai"
+        assert explicitly_set is True
 
     @patch.dict(os.environ, {"LLM_PROVIDER": "  MiniMax  "}, clear=True)
     def test_explicit_provider_strips_and_lowercases(self):
-        assert _detect_provider() == "minimax"
+        provider, explicitly_set = _detect_provider()
+        assert provider == "minimax"
+        assert explicitly_set is True
 
     @patch.dict(os.environ, {"MINIMAX_API_KEY": "mm-test-key"}, clear=True)
     def test_auto_detect_minimax_from_api_key(self):
-        assert _detect_provider() == "minimax"
+        provider, explicitly_set = _detect_provider()
+        assert provider == "minimax"
+        assert explicitly_set is False
 
     @patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}, clear=True)
     def test_auto_detect_openai_from_api_key(self):
-        assert _detect_provider() == "openai"
+        provider, explicitly_set = _detect_provider()
+        assert provider == "openai"
+        assert explicitly_set is False
 
     @patch.dict(
         os.environ,
@@ -46,7 +58,9 @@ class TestDetectProvider:
         clear=True,
     )
     def test_explicit_provider_takes_priority_over_auto_detect(self):
-        assert _detect_provider() == "openai"
+        provider, explicitly_set = _detect_provider()
+        assert provider == "openai"
+        assert explicitly_set is True
 
     @patch.dict(
         os.environ,
@@ -54,7 +68,14 @@ class TestDetectProvider:
         clear=True,
     )
     def test_minimax_key_takes_priority_over_openai_key(self):
-        assert _detect_provider() == "minimax"
+        provider, explicitly_set = _detect_provider()
+        assert provider == "minimax"
+        assert explicitly_set is False
+
+    @patch.dict(os.environ, {"LLM_PROVIDER": "unknown_provider"}, clear=True)
+    def test_unrecognized_provider_raises_value_error(self):
+        with pytest.raises(ValueError, match="Unsupported LLM_PROVIDER"):
+            _detect_provider()
 
 
 # ---------------------------------------------------------------------------
@@ -235,10 +256,9 @@ class TestEdgeCases:
         {"LLM_PROVIDER": "unknown_provider", "OPENAI_API_KEY": "sk-key"},
         clear=True,
     )
-    def test_unknown_provider_falls_back_to_defaults(self):
-        llm = create_llm()
-        # Should still create an LLM with default model
-        assert llm.model_name == "gpt-5.4-2026-03-05"
+    def test_unknown_provider_raises_value_error(self):
+        with pytest.raises(ValueError, match="Unsupported LLM_PROVIDER"):
+            create_llm()
 
     @patch.dict(
         os.environ,
@@ -261,7 +281,17 @@ class TestEdgeCases:
         },
         clear=True,
     )
-    def test_minimax_provider_falls_back_to_openai_key(self):
-        """When MINIMAX_API_KEY is unset but LLM_PROVIDER=minimax, use OPENAI_API_KEY as fallback."""
+    def test_explicit_minimax_without_api_key_raises_value_error(self):
+        """When LLM_PROVIDER=minimax but MINIMAX_API_KEY is unset, raise ValueError."""
+        with pytest.raises(ValueError, match="MINIMAX_API_KEY"):
+            create_llm()
+
+    @patch.dict(
+        os.environ,
+        {"LLM_PROVIDER": "openai", "OPENAI_API_KEY": "sk-dummy"},
+        clear=True,
+    )
+    def test_explicit_openai_without_provider_key_uses_openai_key(self):
+        """Explicit openai provider should use OPENAI_API_KEY without raising ValueError."""
         llm = create_llm()
-        assert llm.model_name == "MiniMax-M2.7"
+        assert llm.model_name == "gpt-5.4-2026-03-05"
