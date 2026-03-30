@@ -1,52 +1,127 @@
 # Deployment
 
-## Render
+## Render (Frontend Only)
 
-The project includes a `render.yaml` for one-click deployment to [Render](https://render.com/).
+The project includes a `render.yaml` that deploys the **frontend** to [Render](https://render.com/).
+The agent is deployed separately — see [LangGraph Platform](#langgraph-platform-langsmith-cloud) below.
 
-### Services
+### Frontend Service (Node)
 
-**Agent** (Python):
-- Runtime: Python 3.12.6
-- Build: `pip install uv && uv sync`
-- Start: `uv run uvicorn main:app --host 0.0.0.0 --port $PORT`
-- Health check: `GET /health`
-- Root directory: `apps/agent`
-
-**Frontend** (Node):
 - Runtime: Node 22
 - Build: `corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @repo/app build`
 - Start: `pnpm --filter @repo/app start`
 - Health check: `GET /api/health`
-- Root directory: (repo root)
 
 ### Environment Variables
 
-| Variable | Service | Required | Notes |
-|----------|---------|----------|-------|
-| `OPENAI_API_KEY` | Agent | Yes | Your OpenAI API key |
-| `LLM_MODEL` | Agent | No | Defaults to `gpt-5.4-2026-03-05` |
-| `LANGSMITH_API_KEY` | Agent | No | For LangSmith tracing |
-| `LANGGRAPH_DEPLOYMENT_URL` | Frontend | Auto | Injected from agent service via `fromService` |
-| `SKIP_INSTALL_DEPS` | Frontend | No | Set to `true` to skip redundant installs |
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `LANGGRAPH_DEPLOYMENT_URL` | Yes | URL of your LangGraph agent (e.g., `https://<id>.default.us.langgraph.app`) |
+| `LANGSMITH_API_KEY` | Yes* | Required when agent is on LangGraph Platform (sent as `x-api-key`) |
+| `RATE_LIMIT_ENABLED` | No | Set to `true` to enable per-IP rate limiting |
+| `RATE_LIMIT_WINDOW_MS` | No | Rate limit window in ms (default: 60000) |
+| `RATE_LIMIT_MAX` | No | Max requests per window (default: 40) |
+| `SKIP_INSTALL_DEPS` | No | Set to `true` to skip redundant installs |
 
-### Auto-Scaling
-
-Both services are configured with:
-- Min instances: 1
-- Max instances: 3
-- Memory target: 80%
-- CPU target: 70%
+\*Not required if the agent is self-hosted on a private network without auth.
 
 ### Deploy
 
 1. Fork the repository
 2. Create a new **Blueprint** on Render
 3. Connect your forked repo
-4. Add `OPENAI_API_KEY` as a secret
-5. Deploy
+4. In the Render dashboard, set `LANGGRAPH_DEPLOYMENT_URL` to your agent's URL
+5. Set `LANGSMITH_API_KEY` to your LangSmith API key
+6. Deploy
 
-Render reads `render.yaml` and creates both services. The frontend automatically gets the agent URL via service discovery.
+Render reads `render.yaml` and creates the frontend service.
+
+## LangGraph Platform (LangSmith Cloud)
+
+The agent can be deployed as a managed service on [LangGraph Platform](https://docs.langchain.com/langsmith/cli#deploy) using the `langgraph deploy` CLI. The platform provides built-in Postgres persistence, tracing, streaming, and auto-scaling.
+
+### Prerequisites
+
+- A [LangSmith](https://smith.langchain.com) account (Plus plan or higher)
+- LangSmith API key (`LANGSMITH_API_KEY`)
+- The `langgraph` CLI: `pip install langgraph-cli`
+- Docker installed and running (Apple Silicon users need Docker Buildx)
+
+### Deploy
+
+```bash
+cd apps/agent
+langgraph deploy --name open-generative-ui-agent
+```
+
+The CLI reads `langgraph.json`, builds a Docker image, and pushes it to the managed registry. Auth is via `LANGSMITH_API_KEY` env var or `--api-key` flag.
+
+After deployment, configure environment variables in the [LangSmith dashboard](https://smith.langchain.com):
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `OPENAI_API_KEY` | Yes | Your OpenAI API key |
+| `LANGGRAPH_CLOUD` | Yes | Set to `true` — skips local checkpointer in favor of platform-managed Postgres |
+| `LLM_MODEL` | No | Defaults to `gpt-5.4-2026-03-05` |
+| `LANGCHAIN_TRACING_V2` | No | Set to `true` for built-in tracing |
+| `LANGCHAIN_PROJECT` | No | Project name for organizing traces |
+
+Note the deployment URL (e.g., `https://<id>.default.us.langgraph.app`).
+
+### Other CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `langgraph deploy list` | List all deployments |
+| `langgraph deploy logs` | Fetch runtime or build logs |
+| `langgraph deploy revisions list <id>` | Show revision history |
+| `langgraph dev` | Local dev server (no Docker) |
+
+## Split Deployment: Render + LangGraph Platform
+
+The recommended production setup runs the frontend on Render and the agent on LangGraph Platform. This gives you managed scaling and Postgres persistence for the agent, with familiar Node hosting for the frontend.
+
+### Architecture
+
+```
+┌──────────────────────┐       HTTPS + x-api-key       ┌─────────────────────────┐
+│  Render (Frontend)   │  ──────────────────────────▶  │  LangGraph Platform     │
+│  Next.js on Node 22  │                               │  (LangSmith Cloud)      │
+│  /api/copilotkit     │  ◀──────────────────────────  │  Python agent           │
+└──────────────────────┘       SSE / streaming          └─────────────────────────┘
+```
+
+### Step-by-Step
+
+1. **Deploy the agent** on LangGraph Platform:
+   ```bash
+   cd apps/agent
+   langgraph deploy --name open-generative-ui-agent
+   ```
+   Then set `OPENAI_API_KEY` and `LANGGRAPH_CLOUD=true` in the LangSmith dashboard.
+   Note the deployment URL.
+
+2. **Deploy the frontend** on Render following the [Render](#render-frontend-only) section.
+   In the Render dashboard, set:
+   - `LANGGRAPH_DEPLOYMENT_URL` = your LangGraph Platform URL (e.g., `https://<id>.default.us.langgraph.app`)
+   - `LANGSMITH_API_KEY` = your LangSmith API key (starts with `lsv2_`)
+
+3. **Verify** by hitting `GET /api/health` on the frontend and sending a test message through the UI.
+
+### How Auth Works
+
+The frontend's API route (`/api/copilotkit`) reads `LANGSMITH_API_KEY` from the environment and sends it as an `x-api-key` header on every request to the agent. LangGraph Platform validates this key. The API key is never exposed to the browser — it stays server-side in the Next.js API route.
+
+### Self-Hosted vs. LangGraph Platform
+
+| Concern | Self-Hosted | LangGraph Platform |
+|---------|-------------|--------------------|
+| Checkpointer | BoundedMemorySaver (in-memory) | Managed Postgres (automatic) |
+| HTTP serving | FastAPI + uvicorn | Platform-managed |
+| Health checks | `/health` endpoint | Platform-managed |
+| Tracing | Optional (LANGSMITH_API_KEY) | Built-in |
+| Scaling | Manual / render.yaml | Platform-managed |
+| Auth | None (private network) | LANGSMITH_API_KEY required |
 
 ## General Deployment
 
@@ -87,55 +162,6 @@ Requirements:
 |---------|----------|----------|
 | Agent | `GET /health` | `{"status": "ok"}` |
 | Frontend | `GET /api/health` | 200 OK |
-
-## LangGraph Platform (LangSmith Cloud)
-
-The agent can be deployed as a managed service on [LangGraph Platform](https://docs.smith.langchain.com/langgraph-platform/deployment) for built-in tracing, streaming, and persistence.
-
-### Prerequisites
-
-- A [LangSmith](https://smith.langchain.com) account (Plus plan or higher)
-- LangSmith API key
-- The `langgraph` CLI: `pip install langgraph-cli`
-
-### Deploy
-
-1. Connect your GitHub repo to LangSmith via **Deployments > + New Deployment**
-2. Set the root directory to `apps/agent`
-3. Configure environment variables in the LangSmith dashboard:
-
-| Variable | Required | Notes |
-|----------|----------|-------|
-| `OPENAI_API_KEY` | Yes | Your OpenAI API key |
-| `LANGGRAPH_CLOUD` | Yes | Set to `true` — enables platform-native checkpointer |
-| `LLM_MODEL` | No | Defaults to `gpt-5.4-2026-03-05` |
-| `LANGCHAIN_TRACING_V2` | No | Set to `true` for built-in tracing |
-| `LANGCHAIN_PROJECT` | No | Project name for organizing traces |
-
-4. Note the deployment URL (e.g., `https://<id>.default.us.langgraph.app`)
-
-### Connect the Frontend
-
-Set `LANGGRAPH_DEPLOYMENT_URL` and `LANGSMITH_API_KEY` on your frontend:
-
-```bash
-LANGGRAPH_DEPLOYMENT_URL=https://<id>.default.us.langgraph.app \
-LANGSMITH_API_KEY=lsv2_... \
-pnpm --filter @repo/app start
-```
-
-The frontend automatically sends `x-api-key` headers when `LANGSMITH_API_KEY` is set.
-
-### Self-Hosted vs. LangGraph Platform
-
-| Concern | Self-Hosted (Render) | LangGraph Platform |
-|---------|---------------------|--------------------|
-| Checkpointer | BoundedMemorySaver (in-memory) | Managed Postgres (automatic) |
-| HTTP serving | FastAPI + uvicorn | Platform-managed |
-| Health checks | `/health` endpoint | Platform-managed |
-| Tracing | Optional (LANGSMITH_API_KEY) | Built-in |
-| Scaling | render.yaml config | Platform-managed |
-| Auth | None (private network) | LANGSMITH_API_KEY required |
 
 ## Docker
 

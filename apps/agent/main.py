@@ -3,6 +3,7 @@ This is the main entry point for the agent.
 It defines the workflow graph, state, tools, nodes and edges.
 """
 
+import logging
 import os
 import warnings
 from pathlib import Path
@@ -22,10 +23,15 @@ from src.plan import plan_visualization
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 # LangGraph Platform provides a managed Postgres-backed checkpointer,
 # so BoundedMemorySaver is only needed for self-hosted / local dev.
-_on_langgraph_platform = bool(os.environ.get("LANGGRAPH_CLOUD"))
+_on_langgraph_platform = os.environ.get("LANGGRAPH_CLOUD", "").lower() == "true"
 checkpointer = None if _on_langgraph_platform else BoundedMemorySaver(max_threads=200)
+
+if _on_langgraph_platform:
+    logger.info("LANGGRAPH_CLOUD=true — using platform-managed checkpointer")
 
 agent = create_deep_agent(
     model=ChatOpenAI(model=os.environ.get("LLM_MODEL", "gpt-5.4-2026-03-05")),
