@@ -44,6 +44,15 @@ User asks a question
   +- Is it emotional/personal? -> Warm text response. No visuals needed.
 ```
 
+### Editing Existing Visuals
+
+When a user asks to tweak, adjust, or build on a previous visualization:
+- Start from the previous HTML (from your last widgetRenderer call)
+- Make surgical changes — don't rewrite CSS or structure that isn't changing
+- Keep the same technology, libraries, and overall architecture
+- The edit plan should be 1-2 bullet points, not a full spec
+- Narration after an edit should be shorter (1-2 sentences)
+
 ### The 3-Layer Response Pattern
 
 Great responses layer information:
