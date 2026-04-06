@@ -14,316 +14,344 @@ export const mcpSkills: Chapter = {
 
 The agent's visual quality comes from **skill documents** — composable \`.txt\` playbooks that define design rules, component patterns, and rendering techniques.
 
-Skills are served through an **MCP (Model Context Protocol) server**, making them accessible to both the LangGraph agent and external AI tools like Claude Desktop.
-
-## Skill Architecture
-
-\`\`\`
-apps/mcp/
-├── skills/
-│   ├── master-agent-playbook.txt    # Core philosophy, response patterns
-│   ├── svg-diagram-skill.txt        # SVG setup, typography, color ramps
-│   └── agent-skills-vol2.txt        # Advanced design system, UI mockups
-└── src/
-    ├── server.ts    # MCP server (resources, prompts, tools)
-    ├── skills.ts    # Skill file loader
-    └── renderer.ts  # HTML document assembly with design system
-\`\`\`
-
-The agent also has a local \`skills/\` directory loaded via \`create_deep_agent(skills=[...])\` — these are loaded at agent startup and available as contextual instructions.`,
-    },
-    {
-      type: "markdown",
-      id: "skills-mcp-server",
-      content: `## MCP Server
-
-The MCP server exposes skills in three ways:
-
-| MCP concept | Name | What it provides |
-|-------------|------|-----------------|
-| **Resource** | \`skills://list\` | JSON array of available skill names |
-| **Resource** | \`skills://{name}\` | Full text of a specific skill |
-| **Prompt** | \`create_widget\` | master-agent-playbook.txt as a pre-composed prompt |
-| **Prompt** | \`create_svg_diagram\` | svg-diagram-skill.txt |
-| **Prompt** | \`create_visualization\` | agent-skills-vol2.txt |
-| **Tool** | \`assemble_document\` | Wraps raw HTML with the full design system CSS/JS |`,
+Skills are served through an **MCP (Model Context Protocol) server**, making them accessible to both the LangGraph agent and external AI tools like Claude Desktop.`,
     },
     {
       type: "code",
       id: "skills-server-code",
       language: "typescript",
-      filename: "apps/mcp/src/server.ts",
-      content: `import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { listSkills, loadSkill } from "./skills.js";
-import { assembleDocument } from "./renderer.js";
-
-export function createMcpServer(): McpServer {
-  const server = new McpServer({
-    name: "open-generative-ui",
-    version: "0.1.0",
-  });
+      filename: "apps/mcp/src/server.ts (simplified)",
+      content: `export function createMcpServer(): McpServer {
+  const server = new McpServer({ name: "open-generative-ui", version: "0.1.0" });
 
   // Resources: list and read skill documents
-  server.registerResource("skills-list", "skills://list", {
-    description: "JSON array of available skill names",
-    mimeType: "application/json",
-  }, async () => ({
-    contents: [{ uri: "skills://list", text: JSON.stringify(listSkills()) }],
-  }));
-
-  server.registerResource("skill",
-    new ResourceTemplate("skills://{name}", { /* ... */ }),
-    { description: "Full text of a skill document" },
-    async (uri, { name }) => ({
-      contents: [{ uri: uri.href, text: loadSkill(name as string) }],
-    })
-  );
+  server.registerResource("skills-list", "skills://list", { ... });
+  server.registerResource("skill", new ResourceTemplate("skills://{name}"), { ... });
 
   // Prompts: pre-composed skill instructions
-  server.registerPrompt("create_widget", {
-    description: "Instructions for creating interactive HTML widgets",
-  }, async () => ({
-    messages: [{ role: "user", content: {
-      type: "text", text: loadSkill("master-agent-playbook")
-    }}],
-  }));
+  server.registerPrompt("create_widget", { ... });       // master-agent-playbook
+  server.registerPrompt("create_svg_diagram", { ... });   // svg-diagram-skill
+  server.registerPrompt("create_visualization", { ... }); // agent-skills-vol2
 
   // Tool: wrap HTML with the full design system
   server.registerTool("assemble_document", {
-    description: "Wraps HTML with theme CSS, SVG classes, form styles, and bridge JS",
-    inputSchema: {
-      title: z.string(),
-      description: z.string(),
-      html: z.string().describe("Self-contained HTML fragment"),
-    },
+    inputSchema: { title, description, html },
   }, async ({ html }) => ({
     content: [{ type: "text", text: assembleDocument(html) }],
   }));
-
-  return server;
 }`,
     },
     {
       type: "markdown",
-      id: "skills-playbook",
-      content: `## Master Agent Playbook
+      id: "skills-design-system",
+      content: `## Design System Tokens
 
-The core skill document defines the agent's **response philosophy** and **decision tree**:
-
-**"Show, don't tell"** — the agent prioritizes visuals over text.
-
-### Response Decision Tree
-
-| User asks about... | Agent produces... |
-|---------------------|-------------------|
-| Quick fact | 1-2 sentences of text |
-| Concept / visual | SVG diagram |
-| Process / flow | Flowchart or stepper |
-| Data-driven question | Interactive chart |
-| Abstract / explorable | Interactive widget |
-| Working code | Running artifact |
-| Comparison | Side-by-side visual |
-
-### 3-Layer Response Pattern
-
-Every visual response uses:
-1. **Hook** (1-2 sentences) — Validate the question, set context
-2. **Visual** — The core explanation as a rendered component
-3. **Narration** (2-4 paragraphs) — Walk through the visual, offer to go deeper`,
-    },
-    {
-      type: "markdown",
-      id: "skills-svg",
-      content: `## SVG Diagram Skill
-
-Defines precise rules for hand-drawn SVG diagrams:
-
-- **ViewBox**: Always 680px wide, height = bottom element y + height + 40px
-- **Typography**: 14px titles, 12px subtitles, weights 400/500 only, sentence case
-- **Text width estimation**: 14px = 8px/char, 12px = 7px/char, +48px padding
-- **9 color ramps**: Teal, Purple, Coral, Pink, Gray, Blue, Green, Amber, Red — each with light/dark variants
-- **Node heights**: Single-line = 44px, two-line = 56px
-- **Arrows**: stroke-width 1.5px, marker-end, never cross boxes
-- **Critical checks**: ViewBox height correct, text fits rectangles, all paths have fill="none"`,
-    },
-    {
-      type: "markdown",
-      id: "skills-vol2",
-      content: `## Advanced Skills (Vol. 2)
-
-The advanced skill document adds a **full design system** with CSS variables:
-
-\`\`\`
---color-background-primary/secondary/tertiary/info/danger/success/warning
---color-text-primary/secondary/tertiary/info/danger/success/warning
---color-border-primary/secondary/tertiary/info/danger/success/warning
---font-sans/serif/mono
---border-radius-md(8px)/lg(12px)/xl(16px)
-\`\`\`
-
-**Key rules**:
-- Typography: h1=22px, h2=18px, h3=16px, body=16px, all weight 500 max
-- Borders: 0.5px solid with tertiary border color
-- Cards: primary background, tertiary border, lg radius, 1rem padding
-- **Explicitly banned**: Gradients, shadows, blur, glow, neon, emoji
-- Min font-size: 11px`,
-    },
-    {
-      type: "code",
-      id: "skills-renderer",
-      language: "typescript",
-      filename: "apps/mcp/src/renderer.ts — assembleDocument (simplified)",
-      content: `// The assemble_document tool wraps agent HTML with:
-// 1. Theme CSS — light/dark mode variables
-// 2. SVG Classes — .c-purple, .c-teal, .c-blue, etc.
-// 3. Form Styles — native-looking buttons, inputs, sliders
-// 4. Bridge JS — sendPrompt(), openLink(), auto-resize
-
-export function assembleDocument(html: string): string {
-  return \`<!DOCTYPE html>
-<html>
-<head>
-  <style>\${THEME_CSS}</style>
-  <style>\${SVG_CLASSES_CSS}</style>
-  <style>\${FORM_STYLES_CSS}</style>
-</head>
-<body>
-  \${html}
-  <script>\${BRIDGE_JS}</script>
-</body>
-</html>\`;
-}
-
-// WARNING: Keep in sync with widget-renderer.tsx
-// when the design system changes.`,
+The skill documents define a full token set that gets injected into every widget iframe. The playground below is a **live token explorer** — it renders real HTML using the same CSS variables the agent uses:`,
     },
     {
       type: "playground",
-      id: "skills-playground",
-      title: "Try it: Skill-Guided SVG Diagram",
+      id: "skills-tokens-playground",
+      title: "Live: Design system token explorer with real rendering",
+      files: {
+        "/App.js": `import { useState, useRef, useEffect } from "react";
+
+// These are the actual CSS variables from renderer.ts
+const THEME_CSS = \`
+:root {
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f7f6f3;
+  --color-background-tertiary: #efeee9;
+  --color-background-info: #E6F1FB;
+  --color-background-danger: #FCEBEB;
+  --color-background-success: #EAF3DE;
+  --color-background-warning: #FAEEDA;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #73726c;
+  --color-text-tertiary: #9c9a92;
+  --color-text-info: #185FA5;
+  --color-text-danger: #A32D2D;
+  --color-text-success: #3B6D11;
+  --color-text-warning: #854F0B;
+  --color-border-tertiary: rgba(0, 0, 0, 0.15);
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background-primary: #1a1a18;
+    --color-background-secondary: #2c2c2a;
+    --color-text-primary: #e8e6de;
+    --color-text-secondary: #9c9a92;
+    --color-border-tertiary: rgba(255, 255, 255, 0.15);
+  }
+}
+body { font-family: var(--font-sans); margin: 0; padding: 16px;
+  background: var(--color-background-primary); color: var(--color-text-primary); }
+\`;
+
+// Templates the user can switch between
+const templates = {
+  "Status cards": \`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+  <div style="padding:14px;border-radius:var(--border-radius-lg);background:var(--color-background-success);border:0.5px solid var(--color-border-tertiary)">
+    <div style="font-size:11px;color:var(--color-text-success)">Healthy</div>
+    <div style="font-size:22px;font-weight:500;color:var(--color-text-success)">12 services</div>
+  </div>
+  <div style="padding:14px;border-radius:var(--border-radius-lg);background:var(--color-background-warning);border:0.5px solid var(--color-border-tertiary)">
+    <div style="font-size:11px;color:var(--color-text-warning)">Degraded</div>
+    <div style="font-size:22px;font-weight:500;color:var(--color-text-warning)">2 services</div>
+  </div>
+  <div style="padding:14px;border-radius:var(--border-radius-lg);background:var(--color-background-danger);border:0.5px solid var(--color-border-tertiary)">
+    <div style="font-size:11px;color:var(--color-text-danger)">Down</div>
+    <div style="font-size:22px;font-weight:500;color:var(--color-text-danger)">0 services</div>
+  </div>
+</div>\`,
+  "Info panel": \`<div style="padding:16px;border-radius:var(--border-radius-lg);background:var(--color-background-info);border:0.5px solid var(--color-border-tertiary)">
+  <div style="font-size:14px;font-weight:500;color:var(--color-text-info);margin-bottom:6px">How the design system works</div>
+  <div style="font-size:13px;color:var(--color-text-info);line-height:1.6">
+    Every widget gets these CSS variables injected automatically. Use <code style="background:rgba(0,0,0,0.06);padding:1px 4px;border-radius:3px">var(--color-text-primary)</code> instead of hardcoded colors and your widgets will support dark mode for free.
+  </div>
+</div>\`,
+  "Data table": \`<table style="width:100%;border-collapse:collapse;font-size:13px">
+  <thead>
+    <tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
+      <th style="text-align:left;padding:8px;color:var(--color-text-tertiary);font-weight:500">Tool</th>
+      <th style="text-align:right;padding:8px;color:var(--color-text-tertiary);font-weight:500">Calls</th>
+      <th style="text-align:right;padding:8px;color:var(--color-text-tertiary);font-weight:500">Avg ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
+      <td style="padding:8px;color:var(--color-text-primary)">widgetRenderer</td>
+      <td style="text-align:right;padding:8px;color:var(--color-text-primary);font-weight:500">847</td>
+      <td style="text-align:right;padding:8px;color:var(--color-text-success)">280</td>
+    </tr>
+    <tr style="border-bottom:0.5px solid var(--color-border-tertiary)">
+      <td style="padding:8px;color:var(--color-text-primary)">manage_todos</td>
+      <td style="text-align:right;padding:8px;color:var(--color-text-primary);font-weight:500">312</td>
+      <td style="text-align:right;padding:8px;color:var(--color-text-success)">45</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;color:var(--color-text-primary)">plan_visualization</td>
+      <td style="text-align:right;padding:8px;color:var(--color-text-primary);font-weight:500">823</td>
+      <td style="text-align:right;padding:8px;color:var(--color-text-warning)">520</td>
+    </tr>
+  </tbody>
+</table>\`,
+};
+
+export default function App() {
+  const [selected, setSelected] = useState("Status cards");
+  const iframeRef = useRef(null);
+
+  useEffect(() => {
+    if (!iframeRef.current) return;
+    const doc = iframeRef.current.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(\`<!DOCTYPE html><html><head><style>\${THEME_CSS}</style></head><body>\${templates[selected]}</body></html>\`);
+    doc.close();
+  }, [selected]);
+
+  return (
+    <div style={{ fontFamily: "system-ui, sans-serif" }}>
+      {/* Template selector */}
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", gap: 6 }}>
+        {Object.keys(templates).map(name => (
+          <button key={name} onClick={() => setSelected(name)} style={{
+            padding: "5px 12px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
+            background: selected === name ? "#5B3FA0" : "#f0f0f0",
+            color: selected === name ? "#fff" : "#6b7280",
+          }}>
+            {name}
+          </button>
+        ))}
+      </div>
+
+      {/* Live rendered preview using the REAL design system CSS */}
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-scripts"
+        style={{ width: "100%", height: 160, border: "none", display: "block" }}
+      />
+
+      {/* Show the HTML source */}
+      <div style={{ borderTop: "1px solid #e5e7eb", padding: 12, background: "#f9fafb" }}>
+        <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", textTransform: "uppercase", marginBottom: 4 }}>HTML using design system tokens:</div>
+        <pre style={{ margin: 0, fontSize: 11, fontFamily: "monospace", color: "#374151", whiteSpace: "pre-wrap", maxHeight: 120, overflow: "auto", lineHeight: 1.5 }}>
+          {templates[selected].trim()}
+        </pre>
+      </div>
+    </div>
+  );
+}`,
+      },
+    },
+    {
+      type: "markdown",
+      id: "skills-svg-rules",
+      content: `## SVG Diagram Skill
+
+The SVG skill defines precise rules for hand-drawn diagrams. The playground below implements these rules as a live diagram builder — add nodes, pick colors from the 9-ramp palette, and watch the SVG follow the viewBox/spacing rules:`,
+    },
+    {
+      type: "playground",
+      id: "skills-svg-playground",
+      title: "Live: SVG diagram builder following skill rules",
       files: {
         "/App.js": `import { useState } from "react";
 
-// This demonstrates the SVG diagram skill rules:
-// - ViewBox 680px wide, responsive
-// - 14px titles, 12px subtitles
-// - 9 color ramps with light/dark variants
-// - Proper text width estimation
+// Implements the actual SVG diagram skill rules:
+// - ViewBox 680px wide, responsive via width="100%"
+// - 14px titles (8px/char), 12px subtitles (7px/char), +48px padding
+// - Two-line nodes: 56px tall, single-line: 44px tall
+// - Arrow markers, stroke-width 1.5px
+// - 9 color ramps from the skill document
 
-const colors = {
+const ramps = {
   teal:   { fill: "#E1F5EE", stroke: "#0F6E56", text: "#085041" },
   purple: { fill: "#EDE9F5", stroke: "#5B3FA0", text: "#3E2B6F" },
   coral:  { fill: "#FCE8E8", stroke: "#C44D4D", text: "#8A2E2E" },
+  pink:   { fill: "#FAEAF3", stroke: "#B54A8C", text: "#7E3362" },
+  gray:   { fill: "#F1F1F0", stroke: "#73726C", text: "#474745" },
   blue:   { fill: "#E3EFFC", stroke: "#2663B3", text: "#1A4680" },
+  green:  { fill: "#E1F5EE", stroke: "#2D8B5F", text: "#1D5C3F" },
   amber:  { fill: "#FEF3DC", stroke: "#B8860B", text: "#7A5A07" },
+  red:    { fill: "#FCEBEB", stroke: "#C44D4D", text: "#8A2E2E" },
 };
 
-function DiagramBuilder() {
+export default function App() {
   const [nodes, setNodes] = useState([
-    { id: 1, label: "User Input", sub: "Chat message", color: "teal", x: 250, y: 40 },
-    { id: 2, label: "CopilotKit Runtime", sub: "API route", color: "purple", x: 250, y: 130 },
-    { id: 3, label: "LangGraph Agent", sub: "Tools + state", color: "blue", x: 250, y: 220 },
-    { id: 4, label: "Widget Renderer", sub: "Sandboxed iframe", color: "coral", x: 250, y: 310 },
+    { id: 1, label: "User message", sub: "Chat input", color: "teal" },
+    { id: 2, label: "CopilotKit runtime", sub: "API route → LangGraph", color: "purple" },
+    { id: 3, label: "Deep agent", sub: "Tools + middleware", color: "blue" },
+    { id: 4, label: "Widget renderer", sub: "Sandboxed iframe", color: "coral" },
   ]);
-
-  const [selectedColor, setSelectedColor] = useState("teal");
+  const [selectedRamp, setSelectedRamp] = useState("teal");
+  const [newLabel, setNewLabel] = useState("");
+  const [newSub, setNewSub] = useState("");
 
   const addNode = () => {
-    const lastY = nodes.length > 0 ? nodes[nodes.length - 1].y : -50;
-    setNodes([...nodes, {
-      id: Date.now(),
-      label: "New Node",
-      sub: "Description",
-      color: selectedColor,
-      x: 250,
-      y: lastY + 90,
+    if (!newLabel) return;
+    setNodes(prev => [...prev, {
+      id: Date.now(), label: newLabel || "Node", sub: newSub || "", color: selectedRamp,
     }]);
+    setNewLabel("");
+    setNewSub("");
   };
 
-  const svgHeight = nodes.length > 0
-    ? nodes[nodes.length - 1].y + 56 + 40  // last y + node height + padding
-    : 100;
+  const removeNode = (id) => setNodes(prev => prev.filter(n => n.id !== id));
+
+  // Calculate layout following skill rules
+  const padding = 40;
+  const gap = 34;
+  const nodePositions = nodes.map((node, i) => {
+    const hasSub = !!node.sub;
+    const h = hasSub ? 56 : 44;
+    const titleW = node.label.length * 8;   // 14px = 8px/char
+    const subW = node.sub ? node.sub.length * 7 : 0;  // 12px = 7px/char
+    const w = Math.max(titleW, subW) + 48;  // +48px padding
+    const y = i === 0 ? padding : null; // computed below
+    return { ...node, h, w, titleW, subW };
+  });
+
+  // Compute y positions
+  let currentY = padding;
+  nodePositions.forEach((n, i) => {
+    n.y = currentY;
+    n.x = 340 - n.w / 2; // center in 680px
+    currentY += n.h + gap;
+  });
+
+  const svgH = nodePositions.length > 0
+    ? nodePositions[nodePositions.length - 1].y + nodePositions[nodePositions.length - 1].h + padding
+    : 120;
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", padding: 20 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
-        SVG Diagram Skill Rules
-      </h2>
-
-      <svg width="100%" viewBox={\`0 0 680 \${svgHeight}\`} xmlns="http://www.w3.org/2000/svg">
-        {/* Arrow marker */}
+    <div style={{ fontFamily: "system-ui, sans-serif", padding: 16 }}>
+      {/* Live SVG output */}
+      <svg width="100%" viewBox={\`0 0 680 \${svgH}\`} xmlns="http://www.w3.org/2000/svg"
+        style={{ background: "#fff", borderRadius: 8, border: "1px solid #e5e7eb" }}>
         <defs>
-          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke"
-              strokeWidth="1.5" strokeLinecap="round" />
+          <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" strokeWidth="1.5" strokeLinecap="round" />
           </marker>
         </defs>
-
-        {/* Connectors */}
-        {nodes.slice(1).map((node, i) => {
-          const prev = nodes[i];
-          return (
-            <line key={\`arrow-\${i}\`}
-              x1={prev.x + 90} y1={prev.y + 56}
-              x2={node.x + 90} y2={node.y}
-              stroke="#9ca3af" strokeWidth="1.5"
-              markerEnd="url(#arrow)"
-            />
-          );
+        {/* Arrows */}
+        {nodePositions.slice(1).map((n, i) => {
+          const prev = nodePositions[i];
+          return <line key={"a"+i} x1={prev.x + prev.w/2} y1={prev.y + prev.h}
+            x2={n.x + n.w/2} y2={n.y} stroke="#9c9a92" strokeWidth="1.5" markerEnd="url(#arr)" />;
         })}
-
         {/* Nodes */}
-        {nodes.map(node => {
-          const c = colors[node.color];
-          // Text width: 14px = 8px/char, 12px = 7px/char, +48px padding
-          const titleW = node.label.length * 8;
-          const subW = node.sub.length * 7;
-          const w = Math.max(titleW, subW) + 48;
+        {nodePositions.map(n => {
+          const c = ramps[n.color];
           return (
-            <g key={node.id}>
-              <rect x={node.x} y={node.y} width={w} height={56}
-                rx="8" fill={c.fill} stroke={c.stroke} strokeWidth="1" />
-              <text x={node.x + w/2} y={node.y + 22}
-                textAnchor="middle" dominantBaseline="central"
-                style={{ fontSize: 14, fontWeight: 500, fill: c.text }}>
-                {node.label}
-              </text>
-              <text x={node.x + w/2} y={node.y + 40}
-                textAnchor="middle" dominantBaseline="central"
-                style={{ fontSize: 12, fill: c.text, opacity: 0.7 }}>
-                {node.sub}
-              </text>
+            <g key={n.id}>
+              <rect x={n.x} y={n.y} width={n.w} height={n.h} rx="8" fill={c.fill} stroke={c.stroke} strokeWidth="1" />
+              <text x={n.x + n.w/2} y={n.y + (n.sub ? 22 : n.h/2)} textAnchor="middle" dominantBaseline="central"
+                style={{ fontSize: 14, fontWeight: 500, fill: c.text }}>{n.label}</text>
+              {n.sub && <text x={n.x + n.w/2} y={n.y + 40} textAnchor="middle" dominantBaseline="central"
+                style={{ fontSize: 12, fill: c.text, opacity: 0.7 }}>{n.sub}</text>}
             </g>
           );
         })}
       </svg>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
-        {Object.keys(colors).map(c => (
-          <button key={c} onClick={() => setSelectedColor(c)} style={{
-            width: 28, height: 28, borderRadius: 6,
-            background: colors[c].fill, border: \`2px solid \${selectedColor === c ? colors[c].stroke : "transparent"}\`,
-            cursor: "pointer",
-          }} title={c} />
-        ))}
-        <button onClick={addNode} style={{
-          padding: "6px 14px", borderRadius: 8, border: "none",
-          background: "#9599CC", color: "#fff", cursor: "pointer",
-          fontWeight: 600, fontSize: 12,
-        }}>
-          + Add Node
-        </button>
+      <div style={{ fontSize: 10, color: "#9c9a92", marginTop: 4, fontFamily: "monospace" }}>
+        viewBox="0 0 680 {svgH}" | {nodes.length} nodes | Height = lastY({nodePositions.length > 0 ? nodePositions[nodePositions.length-1].y : 0}) + nodeH({nodePositions.length > 0 ? nodePositions[nodePositions.length-1].h : 0}) + pad(40)
       </div>
 
-      <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
-        ViewBox: 680 x {svgHeight} | Nodes: 56px tall | Text: 14px/12px | Width = max(chars x 8, chars x 7) + 48
-      </p>
+      {/* Controls */}
+      <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "end" }}>
+        <div>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Label</div>
+          <input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Node title"
+            style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 12, width: 120 }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Subtitle</div>
+          <input value={newSub} onChange={e => setNewSub(e.target.value)} placeholder="Optional"
+            style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 12, width: 100 }} />
+        </div>
+        <div>
+          <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>Color ramp</div>
+          <div style={{ display: "flex", gap: 3 }}>
+            {Object.keys(ramps).map(r => (
+              <button key={r} onClick={() => setSelectedRamp(r)} title={r} style={{
+                width: 18, height: 18, borderRadius: 4, border: selectedRamp === r ? \`2px solid \${ramps[r].stroke}\` : "1px solid #d1d5db",
+                background: ramps[r].fill, cursor: "pointer", padding: 0,
+              }} />
+            ))}
+          </div>
+        </div>
+        <button onClick={addNode} style={{
+          padding: "5px 12px", borderRadius: 6, border: "none", background: "#5B3FA0",
+          color: "#fff", cursor: "pointer", fontWeight: 600, fontSize: 12, alignSelf: "end",
+        }}>+ Add</button>
+      </div>
+
+      {/* Node list with remove */}
+      {nodes.length > 0 && (
+        <div style={{ marginTop: 8, display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {nodes.map(n => (
+            <span key={n.id} style={{
+              padding: "2px 8px", borderRadius: 4, fontSize: 11,
+              background: ramps[n.color].fill, color: ramps[n.color].text,
+              border: \`1px solid \${ramps[n.color].stroke}\`, display: "flex", alignItems: "center", gap: 4,
+            }}>
+              {n.label}
+              <button onClick={() => removeNode(n.id)} style={{
+                background: "none", border: "none", cursor: "pointer", padding: 0,
+                fontSize: 12, color: ramps[n.color].text, opacity: 0.6, lineHeight: 1,
+              }}>x</button>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
-}
-
-export default DiagramBuilder;`,
+}`,
       },
     },
   ],

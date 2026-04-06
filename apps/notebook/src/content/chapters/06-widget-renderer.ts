@@ -12,184 +12,225 @@ export const fullFlow: Chapter = {
       id: "flow-overview",
       content: `# Putting It Together
 
-Now that you've seen each layer, let's trace the **complete flow** from a user message to a rendered visualization.
-
-## End-to-End: "Show me a solar system"
-
-| Step | Layer | What happens |
-|------|-------|-------------|
-| 1 | **Frontend** | User types "Show me a solar system" in CopilotKit chat |
-| 2 | **CopilotKit** | \`CopilotRuntime\` sends message to LangGraph agent via \`LangGraphHttpAgent\` |
-| 3 | **Deep Agent** | Agent acknowledges: "I'll create an interactive solar system for you." |
-| 4 | **Deep Agent** | Agent calls \`plan_visualization(approach="3D orbital simulation", technology="Three.js", ...)\` |
-| 5 | **CopilotKit** | \`useRenderTool("plan_visualization")\` renders \`<PlanCard>\` in the chat stream |
-| 6 | **Deep Agent** | Agent calls \`widgetRenderer({ title: "Solar System", html: "<div>..." })\` |
-| 7 | **CopilotKit** | \`useComponent("widgetRenderer")\` renders \`<WidgetRenderer>\` component |
-| 8 | **Widget Renderer** | Empty iframe shell assembled (Theme CSS + Bridge JS + Import Map) |
-| 9 | **Widget Renderer** | HTML streamed via \`postMessage\` → Idiomorph morphs the DOM |
-| 10 | **Widget Renderer** | \`<script type="module">\` loads Three.js from import map, creates scene |
-| 11 | **Widget Renderer** | Auto-resize reports final height → iframe fits content |
-| 12 | **Deep Agent** | Agent narrates: "The visualization shows planets orbiting the sun..." |`,
-    },
-    {
-      type: "markdown",
-      id: "flow-mcp-path",
-      content: `## MCP Skill Integration Path
-
-When the CopilotKit runtime has an MCP server configured, skills enhance the agent's output quality:
-
-1. Runtime connects to MCP server at startup (\`mcpApps.servers\` config)
-2. Agent can read skill resources (\`skills://master-agent-playbook\`)
-3. Agent follows skill rules: response decision tree, 3-layer pattern, SVG rules
-4. For external tools (Claude Desktop, Cursor), the MCP server also exposes:
-   - **Prompts**: Pre-composed skill instructions (\`create_widget\`, \`create_svg_diagram\`)
-   - **Tools**: \`assemble_document\` wraps HTML with the full design system
-
-The skills layer is what ensures consistent visual quality — without it, the agent would produce inconsistent styling and miss design system variables.`,
-    },
-    {
-      type: "markdown",
-      id: "flow-state-sync",
-      content: `## State Sync Flow
-
-For todo interactions, the state flows bidirectionally:
-
-**User edits a todo:**
-1. User clicks checkbox → \`agent.setState({ todos: updatedList })\`
-2. CopilotKit syncs new state to LangGraph agent backend
-3. Agent sees the update in its next tool call via \`runtime.state.todos\`
-
-**Agent adds a todo:**
-1. Agent calls \`manage_todos([...existingTodos, newTodo])\`
-2. LangGraph \`Command(update={todos: [...]})\` updates agent state
-3. CopilotKit syncs back to frontend → \`agent.state.todos\` updates
-4. React re-renders the todo list
-
-Both directions use the same state object — there's no separate frontend vs. backend state.`,
-    },
-    {
-      type: "code",
-      id: "flow-config",
-      language: "typescript",
-      filename: "Complete CopilotKit runtime configuration",
-      content: `// apps/app/src/app/api/copilotkit/route.ts
-const defaultAgent = new LangGraphHttpAgent({
-  deploymentUrl: process.env.LANGGRAPH_DEPLOYMENT_URL || "http://localhost:8123",
-  agentName: "sample_agent",
-});
-
-const runtime = new CopilotRuntime({
-  agents: { default: defaultAgent },
-  a2ui: { injectA2UITool: true },
-  mcpApps: {
-    servers: process.env.MCP_SERVER_URL ? [{
-      type: "http",
-      url: process.env.MCP_SERVER_URL,
-      serverId: "example_mcp_app",
-    }] : [],
-  },
-});
-
-// apps/agent/main.py
-agent = create_deep_agent(
-    model=ChatOpenAI(model="gpt-5.4-2026-03-05"),
-    tools=[query_data, plan_visualization, *todo_tools, generate_form],
-    middleware=[CopilotKitMiddleware()],
-    context_schema=AgentState,
-    skills=[str(Path(__file__).parent / "skills")],
-    checkpointer=BoundedMemorySaver(max_threads=200),
-    system_prompt="...",
-)`,
+Now let's trace the **complete flow** in one working demo. Type a message, and watch it flow through all four layers — ending with a real rendered widget in an iframe.`,
     },
     {
       type: "playground",
-      id: "flow-playground",
-      title: "Try it: Full Pipeline Simulation",
+      id: "flow-full-demo",
+      title: "Live: Complete end-to-end pipeline — type a message, get a widget",
       files: {
-        "/App.js": `import { useState, useEffect } from "react";
+        "/App.js": `import { useState, useRef, useEffect } from "react";
 
-// Simulates the complete end-to-end flow
-const pipeline = [
-  { layer: "Frontend", action: "User sends message", detail: '"Show me a solar system"', icon: "💬" },
-  { layer: "CopilotKit", action: "Routes to LangGraph agent", detail: "POST /api/copilotkit → localhost:8123", icon: "🔌" },
-  { layer: "Deep Agent", action: "Acknowledges request", detail: '"I\'ll create an interactive solar system visualization."', icon: "🧠" },
-  { layer: "Deep Agent", action: "Calls plan_visualization", detail: "approach: '3D orbital sim', tech: 'Three.js'", icon: "📋" },
-  { layer: "CopilotKit", action: "Renders PlanCard", detail: "useRenderTool renders component in chat", icon: "🔌" },
-  { layer: "Deep Agent", action: "Calls widgetRenderer", detail: "html: '<div id=\\"scene\\">...</div><script type=\\"module\\">...'", icon: "🧠" },
-  { layer: "Widget Renderer", action: "Assembles iframe shell", detail: "Theme CSS + Bridge JS + Import Map", icon: "🖼" },
-  { layer: "Widget Renderer", action: "Streams HTML via postMessage", detail: "Idiomorph morphs DOM, scripts execute sequentially", icon: "🖼" },
-  { layer: "Widget Renderer", action: "Auto-resize complete", detail: "Height: 450px, streaming settled", icon: "🖼" },
-  { layer: "Deep Agent", action: "Narrates result", detail: '"The visualization shows planets orbiting..."', icon: "🧠" },
-];
-
-const layerColors = {
-  "Frontend":        { bg: "#f0fdf4", border: "#a7f3d0", text: "#166534" },
-  "CopilotKit":      { bg: "#f5f3ff", border: "#c4b5fd", text: "#5b21b6" },
-  "Deep Agent":      { bg: "#eff6ff", border: "#93c5fd", text: "#1e40af" },
-  "Widget Renderer": { bg: "#fff7ed", border: "#fdba74", text: "#9a3412" },
+// Prompt → tool library: maps keywords to full widget HTML output
+const widgetLibrary = {
+  dashboard: {
+    plan: { approach: "Metrics dashboard with KPI cards and bar chart", technology: "HTML + CSS", keyElements: ["KPI metric cards", "Horizontal bar chart", "Animated entrances"] },
+    title: "Agent Dashboard",
+    html: \`<style>
+      body{font-family:system-ui,sans-serif;padding:20px;margin:0}
+      .g{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+      .c{padding:12px;border-radius:12px;border:0.5px solid rgba(0,0,0,.12);animation:fadeUp .5s ease forwards;opacity:0}
+      .cl{font-size:11px;margin-bottom:2px}.cv{font-size:22px;font-weight:500}
+      .br{display:flex;align-items:center;gap:8px;margin:5px 0}.bl{width:80px;font-size:12px;color:#73726c;text-align:right}
+      .bt{flex:1;height:20px;background:#f7f6f3;border-radius:6px;overflow:hidden}
+      .bf{height:100%;border-radius:6px;animation:grow .8s ease forwards;transform-origin:left}
+      @keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+      @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    </style>
+    <div class="g">
+      <div class="c" style="background:#EDE9F5;animation-delay:.1s"><div class="cl" style="color:#5B3FA0">Requests</div><div class="cv" style="color:#5B3FA0">2.4k</div></div>
+      <div class="c" style="background:#E1F5EE;animation-delay:.2s"><div class="cl" style="color:#0F6E56">Uptime</div><div class="cv" style="color:#0F6E56">99.9%</div></div>
+      <div class="c" style="background:#E3EFFC;animation-delay:.3s"><div class="cl" style="color:#2663B3">P95</div><div class="cv" style="color:#2663B3">180ms</div></div>
+    </div>
+    <div style="font-size:14px;font-weight:500;margin-bottom:8px">Endpoint traffic</div>
+    <div class="br"><span class="bl">/api/chat</span><div class="bt"><div class="bf" style="width:82%;background:#5B3FA0"></div></div><span style="font-size:11px;color:#73726c">82%</span></div>
+    <div class="br"><span class="bl">/api/tools</span><div class="bt"><div class="bf" style="width:56%;background:#0F6E56;animation-delay:.1s"></div></div><span style="font-size:11px;color:#73726c">56%</span></div>
+    <div class="br"><span class="bl">/api/state</span><div class="bt"><div class="bf" style="width:34%;background:#2663B3;animation-delay:.2s"></div></div><span style="font-size:11px;color:#73726c">34%</span></div>\`,
+  },
+  chart: {
+    plan: { approach: "Animated donut chart showing language distribution", technology: "SVG + CSS animations", keyElements: ["SVG donut ring segments", "Animated arc drawing", "Legend with percentages"] },
+    title: "Language Distribution",
+    html: \`<style>
+      body{font-family:system-ui,sans-serif;padding:20px;margin:0}
+      .legend{display:flex;gap:16px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+      .li{display:flex;align-items:center;gap:5px;font-size:12px;color:#73726c}
+      .dot{width:8px;height:8px;border-radius:2px}
+      circle{transition:stroke-dashoffset 1s ease}
+    </style>
+    <div style="text-align:center">
+      <svg width="180" height="180" viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#EDE9F5" stroke-width="24"/>
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#5B3FA0" stroke-width="24"
+          stroke-dasharray="226 502" stroke-dashoffset="0" transform="rotate(-90 100 100)">
+          <animate attributeName="stroke-dashoffset" from="502" to="0" dur="1s" fill="freeze"/>
+        </circle>
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#0F6E56" stroke-width="24"
+          stroke-dasharray="151 502" stroke-dashoffset="-226" transform="rotate(-90 100 100)">
+          <animate attributeName="stroke-dashoffset" from="-226" to="-226" dur="0.5s" fill="freeze"/>
+        </circle>
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#2663B3" stroke-width="24"
+          stroke-dasharray="75 502" stroke-dashoffset="-377" transform="rotate(-90 100 100)"/>
+        <circle cx="100" cy="100" r="80" fill="none" stroke="#C44D4D" stroke-width="24"
+          stroke-dasharray="50 502" stroke-dashoffset="-452" transform="rotate(-90 100 100)"/>
+      </svg>
+      <div class="legend">
+        <span class="li"><span class="dot" style="background:#5B3FA0"></span>TypeScript 45%</span>
+        <span class="li"><span class="dot" style="background:#0F6E56"></span>Python 30%</span>
+        <span class="li"><span class="dot" style="background:#2663B3"></span>CSS 15%</span>
+        <span class="li"><span class="dot" style="background:#C44D4D"></span>Other 10%</span>
+      </div>
+    </div>\`,
+  },
+  diagram: {
+    plan: { approach: "Architecture flow diagram showing data path", technology: "Inline SVG (skill-guided)", keyElements: ["4 layered nodes with color ramps", "Directional arrows", "680px viewBox, responsive"] },
+    title: "Architecture Flow",
+    html: \`<svg width="100%" viewBox="0 0 680 370" xmlns="http://www.w3.org/2000/svg" style="display:block">
+      <defs><marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round"/></marker></defs>
+      <line x1="340" y1="82" x2="340" y2="110" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#a)"/>
+      <line x1="340" y1="166" x2="340" y2="200" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#a)"/>
+      <line x1="340" y1="256" x2="340" y2="290" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#a)"/>
+      <g><rect x="245" y="30" width="190" height="52" rx="8" fill="#E1F5EE" stroke="#0F6E56"/><text x="340" y="50" text-anchor="middle" dominant-baseline="central" style="font:500 14px system-ui;fill:#085041">User message</text><text x="340" y="68" text-anchor="middle" dominant-baseline="central" style="font:400 12px system-ui;fill:#085041;opacity:.7">Chat input</text></g>
+      <g><rect x="215" y="112" width="250" height="52" rx="8" fill="#EDE9F5" stroke="#5B3FA0"/><text x="340" y="132" text-anchor="middle" dominant-baseline="central" style="font:500 14px system-ui;fill:#3E2B6F">CopilotKit runtime</text><text x="340" y="150" text-anchor="middle" dominant-baseline="central" style="font:400 12px system-ui;fill:#3E2B6F;opacity:.7">LangGraphHttpAgent bridge</text></g>
+      <g><rect x="220" y="202" width="240" height="52" rx="8" fill="#E3EFFC" stroke="#2663B3"/><text x="340" y="222" text-anchor="middle" dominant-baseline="central" style="font:500 14px system-ui;fill:#1A4680">LangGraph deep agent</text><text x="340" y="240" text-anchor="middle" dominant-baseline="central" style="font:400 12px system-ui;fill:#1A4680;opacity:.7">Tools + skills + state</text></g>
+      <g><rect x="230" y="292" width="220" height="52" rx="8" fill="#FCE8E8" stroke="#C44D4D"/><text x="340" y="312" text-anchor="middle" dominant-baseline="central" style="font:500 14px system-ui;fill:#8A2E2E">Widget renderer</text><text x="340" y="330" text-anchor="middle" dominant-baseline="central" style="font:400 12px system-ui;fill:#8A2E2E;opacity:.7">Sandboxed iframe output</text></g>
+    </svg>\`,
+  },
 };
 
-export default function App() {
-  const [step, setStep] = useState(-1);
-  const [running, setRunning] = useState(false);
+const prompts = [
+  { text: "Show me a dashboard", key: "dashboard" },
+  { text: "Create a language chart", key: "chart" },
+  { text: "Draw the architecture", key: "diagram" },
+];
 
-  const run = async () => {
-    setRunning(true);
-    setStep(-1);
-    for (let i = 0; i < pipeline.length; i++) {
-      await new Promise(r => setTimeout(r, 700));
-      setStep(i);
-    }
-    setRunning(false);
+export default function App() {
+  const [input, setInput] = useState("");
+  const [log, setLog] = useState([]);
+  const [phase, setPhase] = useState("idle");
+  const [widgetHtml, setWidgetHtml] = useState("");
+  const iframeRef = useRef(null);
+  const bottomRef = useRef(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [log, widgetHtml]);
+
+  useEffect(() => {
+    if (!iframeRef.current || !widgetHtml) return;
+    const doc = iframeRef.current.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(\`<!DOCTYPE html><html><body style="margin:0">\${widgetHtml}</body></html>\`);
+    doc.close();
+  }, [widgetHtml]);
+
+  const send = async (promptKey) => {
+    const widget = widgetLibrary[promptKey];
+    if (!widget) return;
+    setLog([]);
+    setWidgetHtml("");
+    setInput("");
+
+    // 1. User message
+    setLog([{ type: "user", text: prompts.find(p => p.key === promptKey)?.text || input }]);
+    setPhase("ack");
+    await new Promise(r => setTimeout(r, 500));
+
+    // 2. Acknowledge
+    setLog(prev => [...prev, { type: "agent", text: "I'll create that for you." }]);
+    setPhase("plan");
+    await new Promise(r => setTimeout(r, 700));
+
+    // 3. Plan
+    setLog(prev => [...prev, { type: "plan", data: widget.plan }]);
+    setPhase("build");
+    await new Promise(r => setTimeout(r, 800));
+
+    // 4. Build — render actual widget
+    setLog(prev => [...prev, { type: "widget", title: widget.title }]);
+    setWidgetHtml(widget.html);
+    setPhase("narrate");
+    await new Promise(r => setTimeout(r, 1200));
+
+    // 5. Narrate
+    setLog(prev => [...prev, { type: "agent", text: "Here's the visualization. The data is rendered using the design system's CSS variables, so it supports dark mode automatically. Want me to modify anything?" }]);
+    setPhase("done");
   };
 
   return (
-    <div style={{ fontFamily: "system-ui, sans-serif", padding: 20 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
-        End-to-End Flow
-      </h2>
-      <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
-        Watch a user message flow through all four layers.
-      </p>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
-        {pipeline.map((s, i) => {
-          const active = i <= step;
-          const c = layerColors[s.layer];
-          return (
-            <div key={i} style={{
-              display: "flex", gap: 10, padding: "8px 12px", borderRadius: 8,
-              background: active ? c.bg : "#fafafa",
-              border: \`1px solid \${active ? c.border : "#f0f0f0"}\`,
-              opacity: active ? 1 : 0.3,
-              transition: "all 0.3s ease",
-              fontSize: 13,
-            }}>
-              <span style={{ fontSize: 16 }}>{s.icon}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: active ? c.text : "#9ca3af" }}>
-                  {s.layer}: {s.action}
-                </div>
-                <div style={{
-                  fontSize: 11, fontFamily: "monospace",
-                  color: active ? "#6b7280" : "#d1d5db", marginTop: 2,
+    <div style={{ fontFamily: "system-ui, sans-serif", display: "flex", flexDirection: "column", height: 520 }}>
+      {/* Chat area */}
+      <div style={{ flex: 1, overflow: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+        {log.length === 0 && (
+          <div style={{ textAlign: "center", marginTop: 30 }}>
+            <div style={{ color: "#374151", fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Try a prompt:</div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+              {prompts.map(p => (
+                <button key={p.key} onClick={() => send(p.key)} style={{
+                  padding: "8px 16px", borderRadius: 20, border: "1px solid #e5e7eb",
+                  background: "#fff", cursor: "pointer", fontSize: 13, color: "#374151",
+                  transition: "all 0.15s",
                 }}>
-                  {s.detail}
-                </div>
-              </div>
+                  {p.text}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {log.map((msg, i) => {
+          if (msg.type === "user") return (
+            <div key={i} style={{ alignSelf: "flex-end", padding: "8px 14px", borderRadius: "12px 12px 4px 12px", background: "#5B3FA0", color: "#fff", fontSize: 13, maxWidth: "80%" }}>
+              {msg.text}
             </div>
           );
+          if (msg.type === "agent") return (
+            <div key={i} style={{ padding: "8px 14px", borderRadius: "12px 12px 12px 4px", background: "#f9fafb", border: "1px solid #e5e7eb", fontSize: 13, color: "#374151", maxWidth: "85%", lineHeight: 1.5 }}>
+              {msg.text}
+            </div>
+          );
+          if (msg.type === "plan") return (
+            <div key={i} style={{ padding: 12, borderRadius: 10, background: "#EDE9F5", border: "1px solid #c4b5fd", maxWidth: "85%", fontSize: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#5B3FA0", textTransform: "uppercase", marginBottom: 4 }}>plan_visualization</div>
+              <div style={{ fontWeight: 600, color: "#3E2B6F" }}>{msg.data.approach}</div>
+              <div style={{ color: "#5B3FA0", fontSize: 11, marginTop: 2 }}>Tech: {msg.data.technology}</div>
+            </div>
+          );
+          if (msg.type === "widget") return (
+            <div key={i} style={{ borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", maxWidth: "95%" }}>
+              <div style={{ padding: "6px 12px", background: "#f9fafb", borderBottom: "1px solid #e5e7eb", fontSize: 11, fontWeight: 600, color: "#5B3FA0" }}>
+                widgetRenderer: {msg.title}
+              </div>
+              <iframe ref={iframeRef} sandbox="allow-scripts"
+                style={{ width: "100%", height: 230, border: "none", display: "block" }} />
+            </div>
+          );
+          return null;
         })}
-      </div>
 
-      <button onClick={run} disabled={running} style={{
-        padding: "8px 16px", borderRadius: 8, border: "none",
-        background: running ? "#d1d5db" : "linear-gradient(135deg, #9599CC, #1B936F)",
-        color: "#fff", cursor: running ? "default" : "pointer",
-        fontWeight: 600, fontSize: 13,
-      }}>
-        {running ? "Running..." : "Trace Full Pipeline"}
-      </button>
+        {phase !== "idle" && phase !== "done" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#5B3FA0" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#5B3FA0", animation: "pulse 1s infinite" }} />
+            {phase === "ack" ? "Agent thinking..." : phase === "plan" ? "Planning visualization..." : phase === "build" ? "Rendering widget..." : "Writing narration..."}
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+      <style>{"@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}"}</style>
+
+      {/* Input bar + quick prompts */}
+      <div style={{ padding: 12, borderTop: "1px solid #e5e7eb", display: "flex", gap: 8 }}>
+        {phase === "done" && (
+          <div style={{ display: "flex", gap: 6, flex: 1 }}>
+            {prompts.map(p => (
+              <button key={p.key} onClick={() => send(p.key)} style={{
+                flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #e5e7eb",
+                background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#374151",
+              }}>
+                {p.text}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }`,
@@ -200,15 +241,15 @@ export default function App() {
       id: "flow-extend",
       content: `## Extending the Template
 
-To add your own domain to OpenGenerativeUI:
+To add your own domain:
 
-1. **Define state** — Add fields to \`AgentState\` in \`todos.py\` (or create a new schema)
-2. **Create tools** — Write LangGraph tools that return \`Command(update={...})\` to modify state
-3. **Register components** — Use \`useComponent()\` in the frontend to register UI for agent tool calls
-4. **Write skills** — Add \`.txt\` playbooks to guide the agent's visual output quality
-5. **Configure the system prompt** — Define your mandatory workflow steps
+1. **Define state** — Add fields to \`AgentState\` in Python
+2. **Create tools** — Return \`Command(update={...})\` to modify state
+3. **Register components** — Use \`useComponent()\` for agent-renderable UI
+4. **Write skills** — Add \`.txt\` playbooks for visual quality
+5. **Configure the system prompt** — Define your mandatory workflow
 
-The todo list is the starting point — replace it with your domain (project tracker, inventory, scheduling, etc.) while keeping the same CopilotKit v2 state pattern.`,
+The todo list is the starting point — replace it with your domain while keeping the same CopilotKit v2 state pattern.`,
     },
   ],
 };

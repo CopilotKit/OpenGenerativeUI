@@ -49,7 +49,6 @@ window.openLink = (url: string) => {
 };
 
 // 3. Auto-resize: report content height to parent
-// Content is cloned off-screen to prevent viewport inflation
 function reportHeight() {
   const clone = document.body.cloneNode(true);
   clone.style.cssText = "position:absolute;left:-9999px;width:" +
@@ -63,188 +62,272 @@ function reportHeight() {
 new ResizeObserver(reportHeight).observe(document.body);`,
     },
     {
-      type: "code",
-      id: "wr-importmap",
-      language: "html",
-      filename: "Import Map (enables ES module imports in widgets)",
-      content: `<script type="importmap">
-{
-  "imports": {
-    "three": "https://esm.sh/three@0.170.0",
-    "three/addons/": "https://esm.sh/three@0.170.0/examples/jsm/",
-    "gsap": "https://esm.sh/gsap@3.12.7",
-    "d3": "https://esm.sh/d3@7.9.0",
-    "chart.js": "https://esm.sh/chart.js@4.4.7",
-    "chart.js/auto": "https://esm.sh/chart.js@4.4.7/auto"
-  }
-}
-</script>
-
-<!-- Widgets use these with <script type="module">:
-  import * as THREE from "three";
-  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-  import gsap from "gsap";
-  import * as d3 from "d3";
--->`,
-    },
-    {
       type: "markdown",
       id: "wr-streaming",
       content: `## Streaming with Idiomorph
 
-When the agent streams HTML, the widget renderer uses **Idiomorph** for efficient DOM diffing. Instead of replacing the entire iframe on each chunk:
+When the agent streams HTML, the widget renderer uses **Idiomorph** for efficient DOM diffing. Instead of replacing the entire iframe on each chunk, Idiomorph morphs the existing DOM — preserving interactive state, animations, and scroll position.
 
-1. Each HTML chunk arrives via \`postMessage({ type: 'update-content', html })\`
-2. \`<script>\` tags are **stripped before insertion** (prevents partial script execution)
-3. Idiomorph morphs the existing DOM to match new HTML (preserves state, animations, scroll)
-4. Scripts execute **sequentially** only when all tags are closed
-5. Module detection: if a script uses \`import\`/\`export\` but lacks \`type="module"\`, it's auto-promoted
-6. Scripts are deduped via base64 hash to prevent re-execution on morph cycles
-
-The iframe auto-resizes by reporting content height changes. Height is clamped between 50px and 4000px with an 800ms settling period before the streaming indicator disappears.`,
+The playground below demonstrates this: watch the HTML stream in character-by-character (like an LLM producing tokens), while the iframe updates progressively without flickering.`,
     },
     {
-      type: "code",
-      id: "wr-react-component",
-      language: "tsx",
-      filename: "widget-renderer.tsx — React component (simplified)",
-      content: `export function WidgetRenderer({ title, description, html }: WidgetProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(200);
-  const [htmlSettled, setHtmlSettled] = useState(false);
+      type: "playground",
+      id: "wr-streaming-playground",
+      title: "Live: Streaming HTML into an iframe",
+      files: {
+        "/App.js": `import { useState, useRef, useEffect, useCallback } from "react";
 
-  // Initialize empty iframe shell (prevents broken partial HTML)
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-    iframe.srcdoc = assembleShell(); // Theme CSS + Bridge JS + Import Map
-  }, []);
+// This is a real demo of how the widget renderer streams HTML.
+// The HTML arrives token-by-token (like an LLM), and the iframe
+// updates progressively — just like the real widget-renderer.tsx.
 
-  // Stream HTML updates via postMessage
-  useEffect(() => {
-    if (!html || !loaded) return;
-    iframe.contentWindow.postMessage(
-      { type: "update-content", html },
-      "*"
-    );
-  }, [html, loaded]);
+const FULL_HTML = \`<style>
+  body { font-family: system-ui, sans-serif; padding: 20px; margin: 0; }
+  .card { background: #f7f6f3; border: 0.5px solid rgba(0,0,0,0.15);
+    border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  .metric { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 8px 0; border-bottom: 0.5px solid rgba(0,0,0,0.08); }
+  .metric:last-child { border: none; }
+  .label { font-size: 14px; color: #73726c; }
+  .value { font-size: 20px; font-weight: 500; color: #1a1a1a; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .bar-label { width: 80px; font-size: 12px; color: #73726c; text-align: right; }
+  .bar-track { flex: 1; height: 20px; background: #efeee9; border-radius: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; transition: width 0.8s ease; }
+  h2 { font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 0 0 12px; }
+  h3 { font-size: 16px; font-weight: 500; color: #1a1a1a; margin: 0 0 8px; }
+</style>
+<h2>Agent Performance Dashboard</h2>
+<div class="card">
+  <h3>Key Metrics</h3>
+  <div class="metric"><span class="label">Tool calls</span><span class="value">1,247</span></div>
+  <div class="metric"><span class="label">Avg latency</span><span class="value">340ms</span></div>
+  <div class="metric"><span class="label">Success rate</span><span class="value">99.2%</span></div>
+  <div class="metric"><span class="label">Active threads</span><span class="value">42</span></div>
+</div>
+<div class="card">
+  <h3>Tool Usage</h3>
+  <div class="bar-row"><span class="bar-label">widgets</span><div class="bar-track"><div class="bar-fill" style="width:78%;background:#5B3FA0"></div></div><span style="font-size:12px;color:#73726c">78%</span></div>
+  <div class="bar-row"><span class="bar-label">charts</span><div class="bar-track"><div class="bar-fill" style="width:52%;background:#0F6E56"></div></div><span style="font-size:12px;color:#73726c">52%</span></div>
+  <div class="bar-row"><span class="bar-label">todos</span><div class="bar-track"><div class="bar-fill" style="width:35%;background:#2663B3"></div></div><span style="font-size:12px;color:#73726c">35%</span></div>
+  <div class="bar-row"><span class="bar-label">queries</span><div class="bar-track"><div class="bar-fill" style="width:20%;background:#C44D4D"></div></div><span style="font-size:12px;color:#73726c">20%</span></div>
+</div>\`;
 
-  // Listen for resize messages from iframe bridge
+export default function App() {
+  const [streamedHtml, setStreamedHtml] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [charIndex, setCharIndex] = useState(0);
+  const [iframeHeight, setIframeHeight] = useState(60);
+  const iframeRef = useRef(null);
+  const intervalRef = useRef(null);
+
+  // Listen for resize messages from iframe (just like the real bridge)
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
+    const handler = (e) => {
       if (e.data?.type === "widget-resize") {
-        setHeight(Math.max(50, Math.min(4000, e.data.height)));
+        setIframeHeight(Math.max(60, Math.min(800, e.data.height + 10)));
       }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, []);
 
+  // Update iframe content as HTML streams in
+  useEffect(() => {
+    if (!iframeRef.current || !streamedHtml) return;
+    const doc = iframeRef.current.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(\`<!DOCTYPE html><html><head></head><body style="margin:0">\${streamedHtml}
+      <script>
+        function reportHeight() {
+          window.parent.postMessage({ type: "widget-resize", height: document.body.scrollHeight }, "*");
+        }
+        new ResizeObserver(reportHeight).observe(document.body);
+        reportHeight();
+      </script>
+    </body></html>\`);
+    doc.close();
+  }, [streamedHtml]);
+
+  const startStream = useCallback(() => {
+    setStreamedHtml("");
+    setCharIndex(0);
+    setIsStreaming(true);
+    setIframeHeight(60);
+    let idx = 0;
+    clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      // Stream ~8 chars at a time (simulating token chunks)
+      idx = Math.min(idx + 8, FULL_HTML.length);
+      setStreamedHtml(FULL_HTML.slice(0, idx));
+      setCharIndex(idx);
+      if (idx >= FULL_HTML.length) {
+        clearInterval(intervalRef.current);
+        setIsStreaming(false);
+      }
+    }, 16);
+  }, []);
+
+  useEffect(() => () => clearInterval(intervalRef.current), []);
+
+  const pct = FULL_HTML.length > 0 ? Math.round((charIndex / FULL_HTML.length) * 100) : 0;
+
   return (
-    <div>
-      <header>{title}</header>
-      <p>{description}</p>
-      {isStreaming && <StreamingIndicator />}
-      <iframe
-        ref={iframeRef}
-        sandbox="allow-scripts allow-same-origin"
-        style={{ height }}
-      />
-      {htmlSettled && <ExportOverlay />}
+    <div style={{ fontFamily: "system-ui, sans-serif" }}>
+      {/* Streaming progress bar */}
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={startStream} disabled={isStreaming} style={{
+          padding: "6px 14px", borderRadius: 8, border: "none",
+          background: isStreaming ? "#e5e7eb" : "#5B3FA0", color: isStreaming ? "#9ca3af" : "#fff",
+          cursor: isStreaming ? "default" : "pointer", fontWeight: 600, fontSize: 13, whiteSpace: "nowrap",
+        }}>
+          {isStreaming ? "Streaming..." : "Stream HTML"}
+        </button>
+        <div style={{ flex: 1, height: 6, background: "#efeee9", borderRadius: 3, overflow: "hidden" }}>
+          <div style={{ width: pct + "%", height: "100%", background: "linear-gradient(90deg, #5B3FA0, #0F6E56)", borderRadius: 3, transition: "width 0.05s linear" }} />
+        </div>
+        <span style={{ fontSize: 11, color: "#73726c", fontFamily: "monospace", minWidth: 60, textAlign: "right" }}>
+          {charIndex}/{FULL_HTML.length}
+        </span>
+      </div>
+
+      {/* Live iframe preview — auto-resizes via bridge postMessage */}
+      <div style={{ background: "#fff" }}>
+        {!streamedHtml && !isStreaming ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
+            Click "Stream HTML" to watch the widget render progressively
+          </div>
+        ) : (
+          <iframe
+            ref={iframeRef}
+            sandbox="allow-scripts allow-same-origin"
+            style={{ width: "100%", height: iframeHeight, border: "none", display: "block", transition: "height 0.3s ease" }}
+          />
+        )}
+      </div>
     </div>
   );
 }`,
+      },
     },
     {
       type: "playground",
-      id: "wr-playground",
-      title: "Try it: Mini Widget Renderer",
+      id: "wr-bridge-playground",
+      title: "Live: Bridge communication (sendPrompt + auto-resize)",
       files: {
         "/App.js": `import { useState, useRef, useEffect } from "react";
 
-const defaultHTML = \`<div style="font-family: system-ui, sans-serif; padding: 24px;">
-  <h2 style="font-size: 20px; font-weight: 500;
-    color: var(--color-text-primary, #1a1a1a);">
-    Interactive Widget
-  </h2>
-  <p style="color: var(--color-text-secondary, #73726c); font-size: 14px;">
-    Edit this HTML — it renders in a sandboxed iframe, just like the real widget renderer.
-  </p>
+// This demonstrates the real bridge: the iframe sends messages
+// to the parent via postMessage, and the parent listens.
 
-  <div id="boxes" style="display: flex; gap: 8px; margin-top: 16px;"></div>
-
-  <script>
-    const colors = ["#BEC2FF", "#85E0CE", "#9599CC", "#A8E9DC", "#D4D7FF"];
-    const container = document.getElementById("boxes");
-    colors.forEach((c, i) => {
-      const box = document.createElement("div");
-      box.style.cssText = \\\`
-        width: 50px; height: 50px; border-radius: 10px;
-        background: \\\${c}; cursor: pointer;
-        transition: transform 0.2s ease;
-      \\\`;
-      box.onmouseenter = () => box.style.transform = "scale(1.2) rotate(5deg)";
-      box.onmouseleave = () => box.style.transform = "scale(1)";
-      box.onclick = () => {
-        box.style.borderRadius = box.style.borderRadius === "50%" ? "10px" : "50%";
-      };
-      container.appendChild(box);
-    });
-  </script>
-</div>\`;
+const WIDGET_HTML = \`
+<style>
+  body { font-family: system-ui, sans-serif; padding: 16px; margin: 0; }
+  .prompt-btn { padding: 8px 16px; border-radius: 8px; border: none;
+    background: #5B3FA0; color: #fff; font-weight: 500; cursor: pointer;
+    font-size: 13px; margin: 4px; transition: transform 0.15s; }
+  .prompt-btn:hover { transform: scale(1.03); }
+  .expander { margin-top: 12px; }
+  .toggle-btn { padding: 6px 12px; border-radius: 6px; border: 0.5px solid rgba(0,0,0,0.15);
+    background: #f7f6f3; cursor: pointer; font-size: 12px; color: #73726c; }
+  .extra { margin-top: 8px; padding: 12px; background: #f7f6f3; border-radius: 8px;
+    font-size: 13px; color: #73726c; display: none; }
+  .extra.open { display: block; }
+</style>
+<h3 style="font-size:16px;font-weight:500;margin:0 0 8px">Bridge Demo Widget</h3>
+<p style="font-size:13px;color:#73726c;margin:0 0 12px">
+  These buttons call <code>window.sendPrompt()</code> — the parent catches the message.
+</p>
+<div>
+  <button class="prompt-btn" onclick="window.parent.postMessage({type:'send-prompt',prompt:'Show me a bar chart of quarterly revenue'},'*')">
+    Ask for a chart
+  </button>
+  <button class="prompt-btn" onclick="window.parent.postMessage({type:'send-prompt',prompt:'Add 3 todos for a product launch'},'*')">
+    Ask for todos
+  </button>
+  <button class="prompt-btn" onclick="window.parent.postMessage({type:'send-prompt',prompt:'Explain the widget renderer architecture'},'*')">
+    Ask to explain
+  </button>
+</div>
+<div class="expander">
+  <button class="toggle-btn" onclick="
+    var el = document.getElementById('extra');
+    el.classList.toggle('open');
+    window.parent.postMessage({type:'widget-resize', height: document.body.scrollHeight}, '*');
+  ">Toggle more content (triggers auto-resize)</button>
+  <div id="extra" class="extra">
+    This extra content changes the iframe height. The bridge reports the new height
+    to the parent via <code>postMessage({type:'widget-resize'})</code>, and the
+    parent adjusts the iframe size — no fixed heights needed.
+  </div>
+</div>
+\`;
 
 export default function App() {
-  const [html, setHtml] = useState(defaultHTML);
   const iframeRef = useRef(null);
+  const [height, setHeight] = useState(180);
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === "widget-resize") {
+        setHeight(Math.max(80, e.data.height + 10));
+      }
+      if (e.data?.type === "send-prompt") {
+        setMessages(prev => [...prev, { text: e.data.prompt, time: new Date().toLocaleTimeString() }]);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   useEffect(() => {
     if (!iframeRef.current) return;
     const doc = iframeRef.current.contentDocument;
     if (!doc) return;
     doc.open();
-    doc.write(\`<!DOCTYPE html>
-<html><head>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head><body style="margin:0;background:transparent;">\${html}</body></html>\`);
+    doc.write(\`<!DOCTYPE html><html><body style="margin:0">\${WIDGET_HTML}
+      <script>
+        new ResizeObserver(() => {
+          window.parent.postMessage({type:'widget-resize', height: document.body.scrollHeight}, '*');
+        }).observe(document.body);
+      </script>
+    </body></html>\`);
     doc.close();
-  }, [html]);
+  }, []);
 
   return (
     <div style={{ fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        <div>
-          <div style={{
-            padding: "8px 12px", fontSize: 12, fontWeight: 600,
-            background: "#f9fafb", borderBottom: "1px solid #e5e7eb",
-            color: "#6b7280",
-          }}>
-            HTML (edit me)
-          </div>
-          <textarea
-            value={html}
-            onChange={(e) => setHtml(e.target.value)}
-            spellCheck={false}
-            style={{
-              width: "100%", height: 200, padding: 12, border: "none",
-              fontFamily: "'SF Mono', 'Fira Code', monospace", fontSize: 12,
-              lineHeight: 1.5, resize: "none", outline: "none", background: "#fff",
-            }}
-          />
+      {/* The widget iframe */}
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-scripts allow-same-origin"
+        style={{ width: "100%", height, border: "none", display: "block",
+          transition: "height 0.3s ease", borderBottom: "1px solid #e5e7eb" }}
+      />
+
+      {/* Parent message log — shows what the bridge sent */}
+      <div style={{ padding: 12, background: "#f9fafb", minHeight: 60 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Parent received via postMessage:
         </div>
-        <div>
-          <div style={{
-            padding: "8px 12px", fontSize: 12, fontWeight: 600,
-            background: "#f9fafb", borderTop: "1px solid #e5e7eb",
-            borderBottom: "1px solid #e5e7eb", color: "#6b7280",
-          }}>
-            Sandboxed iframe preview
+        {messages.length === 0 ? (
+          <div style={{ fontSize: 12, color: "#9ca3af", fontStyle: "italic" }}>
+            Click a button inside the widget above...
           </div>
-          <iframe
-            ref={iframeRef}
-            sandbox="allow-scripts"
-            style={{ width: "100%", height: 200, border: "none", background: "#fff" }}
-          />
-        </div>
+        ) : (
+          messages.map((m, i) => (
+            <div key={i} style={{
+              padding: "6px 10px", marginBottom: 4, borderRadius: 6,
+              background: "#fff", border: "1px solid #e5e7eb", fontSize: 12,
+              display: "flex", justifyContent: "space-between",
+            }}>
+              <span><strong style={{color:"#5B3FA0"}}>sendPrompt:</strong> {m.text}</span>
+              <span style={{ color: "#9ca3af", fontSize: 10 }}>{m.time}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
