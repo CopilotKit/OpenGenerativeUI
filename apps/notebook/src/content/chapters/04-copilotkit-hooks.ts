@@ -1,250 +1,307 @@
 import type { Chapter } from "@/lib/types";
 
-export const copilotKitHooks: Chapter = {
-  id: "copilotkit-hooks",
-  title: "CopilotKit Hooks",
+export const deepAgent: Chapter = {
+  id: "deep-agent",
+  title: "Deep Agent",
   description:
-    "The React hooks that connect your frontend to the AI agent.",
-  icon: "🪝",
+    "The LangGraph agent: create_deep_agent, tools, state, and memory.",
+  icon: "🧠",
   cells: [
     {
       type: "markdown",
-      id: "hooks-overview",
-      content: `# CopilotKit Hooks
+      id: "da-overview",
+      content: `# The Deep Agent
 
-CopilotKit provides several React hooks that form the bridge between your frontend and the AI agent. Here's an overview of the key hooks used in OpenGenerativeUI:
+The agent backend uses \`create_deep_agent\` from the \`deepagents\` library — a LangGraph-based agent factory that supports tools, middleware, skills, and bounded memory.
 
-| Hook | Purpose |
-|------|---------|
-| \`useAgent()\` | Access agent state, send messages, check if agent is running |
-| \`useComponent()\` | Register a React component the agent can render in chat |
-| \`useFrontendTool()\` | Register a JS function the agent can call in the browser |
-| \`useRenderTool()\` | Register a tool that renders UI while executing |
-| \`useHumanInTheLoop()\` | Create async tools that pause for user input |`,
-    },
-    {
-      type: "markdown",
-      id: "hooks-useagent",
-      content: `## useAgent()
-
-The core hook. It gives you access to the agent's state and lets you interact with it:
-
-- \`agent.state\` — The current agent state (typed by your AgentState schema)
-- \`agent.setState()\` — Update the agent's state from the frontend
-- \`agent.isRunning\` — Whether the agent is currently processing
-- \`agent.sendMessage()\` — Send a message to the agent programmatically`,
+The agent is configured in a single file (\`main.py\`) with:
+- A language model (GPT-5.4)
+- A set of tools (todos, planning, data query, form generation)
+- CopilotKit middleware (bridges agent state to the frontend)
+- A skills directory (loaded at runtime for contextual instructions)
+- A system prompt defining the visualization workflow
+- A bounded memory saver (prevents OOM on constrained hosts)`,
     },
     {
       type: "code",
-      id: "hooks-useagent-code",
-      language: "tsx",
-      filename: "Using useAgent()",
-      content: `import { useAgent } from "@copilotkit/react-core";
+      id: "da-main",
+      language: "python",
+      filename: "apps/agent/main.py",
+      content: `from deepagents import create_deep_agent
+from copilotkit import CopilotKitMiddleware, LangGraphAGUIAgent
+from ag_ui_langgraph import add_langgraph_fastapi_endpoint
+from langchain_openai import ChatOpenAI
 
-function TodoCanvas() {
-  const { agent } = useAgent();
+agent = create_deep_agent(
+    model=ChatOpenAI(model=os.environ.get("LLM_MODEL", "gpt-5.4-2026-03-05")),
+    tools=[query_data, plan_visualization, *todo_tools, generate_form],
+    middleware=[CopilotKitMiddleware()],
+    context_schema=AgentState,
+    skills=[str(Path(__file__).parent / "skills")],
+    checkpointer=BoundedMemorySaver(max_threads=200),
+    system_prompt="...",  # See below
+)
 
-  // Read state
-  const todos = agent.state?.todos || [];
-
-  // Write state (syncs to agent backend)
-  const addTodo = (todo) => {
-    agent.setState({ todos: [...todos, todo] });
-  };
-
-  // Check if agent is working
-  if (agent.isRunning) {
-    return <LoadingSpinner />;
-  }
-
-  return <TodoList todos={todos} onAdd={addTodo} />;
-}`,
+# FastAPI endpoint — CopilotKit runtime connects here
+app = FastAPI()
+add_langgraph_fastapi_endpoint(
+    app=app,
+    agent=LangGraphAGUIAgent(
+        name="sample_agent",
+        description="CopilotKit + LangGraph demo agent",
+        graph=agent,
+    ),
+    path="/",
+)`,
     },
     {
       type: "markdown",
-      id: "hooks-usecomponent",
-      content: `## useComponent()
+      id: "da-state",
+      content: `## Agent State Schema
 
-Registers a React component as a tool the agent can call. When the agent calls this tool, instead of returning text, CopilotKit renders your component inline in the chat with the agent-provided props:`,
+State is defined as a Python TypedDict. CopilotKit syncs this bidirectionally with the frontend via \`useAgent()\`:`,
     },
     {
       type: "code",
-      id: "hooks-usecomponent-code",
-      language: "tsx",
-      filename: "Registering a component tool",
-      content: `import { useComponent } from "@copilotkit/react-core";
-import { z } from "zod";
+      id: "da-state-code",
+      language: "python",
+      filename: "apps/agent/src/todos.py",
+      content: `from langchain.agents import AgentState as BaseAgentState
+from typing import TypedDict, Literal
 
-function MyChart({ title, data }) {
-  return (
-    <div>
-      <h3>{title}</h3>
-      {/* render chart with data */}
-    </div>
-  );
-}
+class Todo(TypedDict):
+    id: str
+    title: str
+    description: str
+    emoji: str
+    status: Literal["pending", "completed"]
 
-// In your hook setup:
-useComponent("myChart", {
-  component: MyChart,
-  schema: z.object({
-    title: z.string(),
-    data: z.array(z.object({
-      label: z.string(),
-      value: z.number(),
-    })),
-  }),
-  description: "Render a custom chart",
-});`,
+class AgentState(BaseAgentState):
+    todos: list[Todo]`,
     },
     {
       type: "markdown",
-      id: "hooks-usefrontendtool",
-      content: `## useFrontendTool()
+      id: "da-tools",
+      content: `## Tools
 
-Registers a JavaScript function that the agent can call to perform actions in the browser. Unlike \`useComponent()\`, this doesn't render UI — it executes logic:`,
+The agent has 5 tools, each serving a specific role:
+
+| Tool | Purpose | Returns |
+|------|---------|---------|
+| \`manage_todos\` | Add/update/remove todos | \`Command(update={todos: [...]})\` — updates state |
+| \`get_todos\` | Read current todos | Current state.todos |
+| \`plan_visualization\` | **Mandatory** before any visual | Plan summary string |
+| \`query_data\` | Fetch CSV data for charts | Cached row dictionaries |
+| \`generate_form\` | Produce login/contact forms | Surface update events |
+
+The \`manage_todos\` tool is the most important — it uses LangGraph's \`Command\` to atomically update state:`,
     },
     {
       type: "code",
-      id: "hooks-usefrontendtool-code",
-      language: "tsx",
-      filename: "Frontend tool: theme toggle",
-      content: `import { useFrontendTool } from "@copilotkit/react-core";
+      id: "da-manage-todos",
+      language: "python",
+      filename: "apps/agent/src/todos.py — manage_todos",
+      content: `@tool
+def manage_todos(todos: list[Todo], runtime: ToolRuntime) -> Command:
+    """Manage the current todos."""
+    # Ensure all todos have unique IDs
+    for todo in todos:
+        if "id" not in todo or not todo["id"]:
+            todo["id"] = str(uuid.uuid4())
 
-useFrontendTool("toggleTheme", {
-  description: "Toggle between light and dark theme",
-  schema: z.object({
-    theme: z.enum(["light", "dark"]).describe("The theme to switch to"),
-  }),
-  handler: ({ theme }) => {
-    document.documentElement.classList.remove("light", "dark");
-    document.documentElement.classList.add(theme);
-    return \`Switched to \${theme} mode\`;
-  },
-});`,
+    # Atomic state update via LangGraph Command
+    return Command(update={
+        "todos": todos,
+        "messages": [
+            ToolMessage(
+                content="Successfully updated todos",
+                tool_call_id=runtime.tool_call_id
+            )
+        ]
+    })`,
+    },
+    {
+      type: "code",
+      id: "da-plan",
+      language: "python",
+      filename: "apps/agent/src/plan.py — plan_visualization",
+      content: `@tool
+def plan_visualization(
+    approach: str, technology: str, key_elements: list[str]
+) -> str:
+    """Plan a visualization before building it. MUST be called before
+    widgetRenderer, pieChart, or barChart.
+
+    Args:
+        approach: One sentence describing the visualization strategy.
+        technology: The primary technology (e.g. "Three.js", "D3.js",
+            "inline SVG", "Chart.js").
+        key_elements: 2-4 concise bullet points of what will be built.
+    """
+    elements = "\\n".join(f"  - {e}" for e in key_elements)
+    return f"Plan: {approach}\\nTech: {technology}\\n{elements}"`,
+    },
+    {
+      type: "markdown",
+      id: "da-system-prompt",
+      content: `## System Prompt
+
+The system prompt encodes the **mandatory visualization workflow** and quality standards:
+
+1. **Acknowledge** → **Plan** → **Build** → **Narrate** (never skip plan)
+2. \`<script type="module">\` is REQUIRED for import map usage
+3. 3D content MUST use Three.js with WebGL, PBR materials, multiple lights, OrbitControls
+4. Every visualization should be "polished and portfolio-ready"
+5. Always call \`query_data\` before showing charts
+6. Be brief about CopilotKit/LangGraph explanations (1-2 sentences)`,
+    },
+    {
+      type: "markdown",
+      id: "da-memory",
+      content: `## Bounded Memory
+
+The default LangGraph \`MemorySaver\` stores all conversation threads in memory forever — a problem on memory-constrained hosts (512MB). \`BoundedMemorySaver\` adds FIFO eviction:`,
+    },
+    {
+      type: "code",
+      id: "da-memory-code",
+      language: "python",
+      filename: "apps/agent/src/bounded_memory_saver.py",
+      content: `class BoundedMemorySaver(MemorySaver):
+    """MemorySaver that evicts oldest threads when exceeding max_threads."""
+
+    def __init__(self, max_threads: int = 200):
+        super().__init__()
+        self.max_threads = max_threads
+        self._insertion_order: OrderedDict[str, None] = OrderedDict()
+
+    def put(self, config, checkpoint, metadata, new_versions):
+        thread_id = config["configurable"]["thread_id"]
+        self._insertion_order[thread_id] = None
+        self._insertion_order.move_to_end(thread_id)  # LRU tracking
+
+        result = super().put(config, checkpoint, metadata, new_versions)
+
+        # Evict oldest threads when over limit
+        while len(self.storage) > self.max_threads:
+            oldest, _ = self._insertion_order.popitem(last=False)
+            if oldest in self.storage:
+                del self.storage[oldest]
+        return result`,
     },
     {
       type: "playground",
-      id: "hooks-playground",
-      title: "Try it: Simulated Agent Hooks",
+      id: "da-playground",
+      title: "Try it: Agent Tool Pipeline",
       files: {
-        "/App.js": `import { useState, useCallback } from "react";
+        "/App.js": `import { useState } from "react";
 
-// Simulating what useAgent() provides
-function useSimulatedAgent() {
-  const [state, setState] = useState({
-    todos: [
-      { id: "1", title: "Read the docs", emoji: "📖", status: "pending" },
-    ],
-    theme: "light",
-  });
-  const [isRunning, setIsRunning] = useState(false);
+// Simulate the mandatory visualization workflow:
+// Acknowledge → Plan → Build → Narrate
 
-  const simulateAgentAction = useCallback(async () => {
-    setIsRunning(true);
-    // Simulate agent thinking...
-    await new Promise(r => setTimeout(r, 1500));
-    setState(prev => ({
-      ...prev,
-      todos: [
-        ...prev.todos,
-        {
-          id: String(Date.now()),
-          title: "Agent-added task",
-          emoji: "🤖",
-          status: "pending",
-        },
+const steps = [
+  {
+    type: "acknowledge",
+    content: "I'll create a visualization showing the agent architecture.",
+  },
+  {
+    type: "tool_call",
+    tool: "plan_visualization",
+    args: {
+      approach: "Layered diagram showing data flow from user to agent to frontend",
+      technology: "inline SVG",
+      keyElements: [
+        "User input → CopilotKit runtime",
+        "LangGraph agent processes with tools",
+        "State syncs back to React frontend",
+        "Widget renderer displays result",
       ],
-    }));
-    setIsRunning(false);
-  }, []);
-
-  return { state, setState, isRunning, simulateAgentAction };
-}
+    },
+  },
+  {
+    type: "tool_call",
+    tool: "widgetRenderer",
+    args: { title: "Architecture Flow", description: "Agent data flow" },
+  },
+  {
+    type: "narrate",
+    content: "The diagram shows how a user message flows through CopilotKit to the LangGraph agent, which calls tools to update state, and the result syncs back to the frontend for rendering.",
+  },
+];
 
 export default function App() {
-  const { state, setState, isRunning, simulateAgentAction } = useSimulatedAgent();
+  const [current, setCurrent] = useState(-1);
+  const [running, setRunning] = useState(false);
 
-  const toggleTodo = (id) => {
-    setState(prev => ({
-      ...prev,
-      todos: prev.todos.map(t =>
-        t.id === id
-          ? { ...t, status: t.status === "completed" ? "pending" : "completed" }
-          : t
-      ),
-    }));
+  const runPipeline = async () => {
+    setRunning(true);
+    setCurrent(-1);
+    for (let i = 0; i < steps.length; i++) {
+      await new Promise(r => setTimeout(r, 1000));
+      setCurrent(i);
+    }
+    setRunning(false);
   };
 
   return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", padding: 20 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
-          Hook Simulation
-        </h2>
-        {isRunning && (
-          <span style={{
-            fontSize: 12, padding: "2px 8px", borderRadius: 12,
-            background: "#BEC2FF", color: "#4a4a8a", fontWeight: 600,
-          }}>
-            Agent working...
-          </span>
-        )}
-      </div>
-
-      <div style={{ marginBottom: 16 }}>
-        {state.todos.map(t => (
-          <div
-            key={t.id}
-            onClick={() => toggleTodo(t.id)}
-            style={{
-              padding: "10px 12px", marginBottom: 6, borderRadius: 8,
-              background: t.status === "completed" ? "#f0fdf4" : "#fff",
-              border: "1px solid #e5e7eb", cursor: "pointer", fontSize: 14,
-              textDecoration: t.status === "completed" ? "line-through" : "none",
-            }}
-          >
-            {t.emoji} {t.title}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={simulateAgentAction}
-          disabled={isRunning}
-          style={{
-            padding: "8px 16px", borderRadius: 8, border: "none",
-            background: isRunning ? "#d1d5db" : "#9599CC",
-            color: "#fff", cursor: isRunning ? "default" : "pointer",
-            fontWeight: 600, fontSize: 13,
-          }}
-        >
-          {isRunning ? "Thinking..." : "Simulate Agent Action"}
-        </button>
-        <button
-          onClick={() => setState(prev => ({
-            ...prev,
-            todos: [...prev.todos, {
-              id: String(Date.now()),
-              title: "User-added task",
-              emoji: "👤",
-              status: "pending",
-            }],
-          }))}
-          style={{
-            padding: "8px 16px", borderRadius: 8, fontWeight: 600,
-            background: "#85E0CE", color: "#0a4a3a", border: "none",
-            cursor: "pointer", fontSize: 13,
-          }}
-        >
-          User Adds Todo
-        </button>
-      </div>
-
-      <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 12 }}>
-        Both buttons modify the same state — just like agent.setState() and user interactions do in the real app.
+    <div style={{ fontFamily: "system-ui, sans-serif", padding: 20 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+        Mandatory Visualization Workflow
+      </h2>
+      <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
+        Every visual response follows: Acknowledge → Plan → Build → Narrate
       </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+        {steps.map((step, i) => {
+          const active = i <= current;
+          const isCurrent = i === current;
+          return (
+            <div
+              key={i}
+              style={{
+                padding: 12, borderRadius: 8, fontSize: 13,
+                background: active ? (step.type === "tool_call" ? "#f5f3ff" : "#f9fafb") : "#fafafa",
+                border: \`1px solid \${isCurrent ? "#9599CC" : active ? "#e5e7eb" : "#f0f0f0"}\`,
+                opacity: active ? 1 : 0.4,
+                transition: "all 0.3s ease",
+              }}
+            >
+              <div style={{
+                fontSize: 11, fontWeight: 600, textTransform: "uppercase",
+                color: step.type === "tool_call" ? "#9599CC" : "#6b7280",
+                marginBottom: 4,
+              }}>
+                {step.type === "tool_call" ? \`🔧 \${step.tool}\` :
+                 step.type === "acknowledge" ? "💬 Acknowledge" :
+                 "📝 Narrate"}
+              </div>
+              {step.type === "tool_call" ? (
+                <pre style={{
+                  margin: 0, fontSize: 11, fontFamily: "monospace",
+                  color: "#374151", whiteSpace: "pre-wrap",
+                }}>
+                  {JSON.stringify(step.args, null, 2)}
+                </pre>
+              ) : (
+                <div style={{ color: "#374151" }}>{step.content}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={runPipeline}
+        disabled={running}
+        style={{
+          padding: "8px 16px", borderRadius: 8, border: "none",
+          background: running ? "#d1d5db" : "#9599CC", color: "#fff",
+          cursor: running ? "default" : "pointer", fontWeight: 600, fontSize: 13,
+        }}
+      >
+        {running ? "Running pipeline..." : "Run Visualization Pipeline"}
+      </button>
     </div>
   );
 }`,

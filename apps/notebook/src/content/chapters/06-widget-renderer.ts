@@ -1,197 +1,195 @@
 import type { Chapter } from "@/lib/types";
 
-export const widgetRenderer: Chapter = {
-  id: "widget-renderer",
-  title: "Widget Renderer",
+export const fullFlow: Chapter = {
+  id: "full-flow",
+  title: "Putting It Together",
   description:
-    "The sandboxed iframe that renders agent-generated HTML, SVG, and 3D content.",
-  icon: "🖼",
+    "The complete end-to-end flow from user message to rendered visualization.",
+  icon: "🔗",
   cells: [
     {
       type: "markdown",
-      id: "widget-concept",
-      content: `# Widget Renderer
+      id: "flow-overview",
+      content: `# Putting It Together
 
-The Widget Renderer is the most flexible generative UI component. It takes **arbitrary HTML/CSS/JS** from the agent and renders it in a **sandboxed iframe**. This is what enables the agent to produce:
+Now that you've seen each layer, let's trace the **complete flow** from a user message to a rendered visualization.
 
-- 3D scenes (Three.js)
-- Data visualizations (D3, Chart.js)
-- Animated graphics (GSAP)
-- Interactive SVG diagrams
-- Custom form UIs
-- Anything expressible in HTML
+## End-to-End: "Show me a solar system"
 
-## Security Model
-
-The iframe is sandboxed with \`allow-scripts allow-same-origin\`, meaning:
-- Scripts can run inside the iframe
-- The iframe cannot navigate the parent page
-- The iframe cannot access parent cookies or storage
-- Communication happens only through \`postMessage\``,
-    },
-    {
-      type: "code",
-      id: "widget-bridge",
-      language: "typescript",
-      filename: "Bridge API (injected into iframe)",
-      content: `// The bridge script injected into every widget iframe:
-
-// Send a new prompt to the agent from inside the widget
-window.sendPrompt = (text: string) => {
-  window.parent.postMessage(
-    { type: "send-prompt", prompt: text },
-    "*"
-  );
-};
-
-// Open an external link (handled by parent)
-window.openLink = (url: string) => {
-  window.parent.postMessage(
-    { type: "open-link", url },
-    "*"
-  );
-};
-
-// Auto-resize: report height changes to parent
-const observer = new ResizeObserver(() => {
-  window.parent.postMessage(
-    { type: "resize", height: document.body.scrollHeight },
-    "*"
-  );
-});
-observer.observe(document.body);`,
+| Step | Layer | What happens |
+|------|-------|-------------|
+| 1 | **Frontend** | User types "Show me a solar system" in CopilotKit chat |
+| 2 | **CopilotKit** | \`CopilotRuntime\` sends message to LangGraph agent via \`LangGraphHttpAgent\` |
+| 3 | **Deep Agent** | Agent acknowledges: "I'll create an interactive solar system for you." |
+| 4 | **Deep Agent** | Agent calls \`plan_visualization(approach="3D orbital simulation", technology="Three.js", ...)\` |
+| 5 | **CopilotKit** | \`useRenderTool("plan_visualization")\` renders \`<PlanCard>\` in the chat stream |
+| 6 | **Deep Agent** | Agent calls \`widgetRenderer({ title: "Solar System", html: "<div>..." })\` |
+| 7 | **CopilotKit** | \`useComponent("widgetRenderer")\` renders \`<WidgetRenderer>\` component |
+| 8 | **Widget Renderer** | Empty iframe shell assembled (Theme CSS + Bridge JS + Import Map) |
+| 9 | **Widget Renderer** | HTML streamed via \`postMessage\` → Idiomorph morphs the DOM |
+| 10 | **Widget Renderer** | \`<script type="module">\` loads Three.js from import map, creates scene |
+| 11 | **Widget Renderer** | Auto-resize reports final height → iframe fits content |
+| 12 | **Deep Agent** | Agent narrates: "The visualization shows planets orbiting the sun..." |`,
     },
     {
       type: "markdown",
-      id: "widget-streaming",
-      content: `## Streaming Updates
+      id: "flow-mcp-path",
+      content: `## MCP Skill Integration Path
 
-When the agent streams HTML content, the widget renderer uses **Idiomorph** for efficient DOM diffing. Instead of replacing the entire iframe content on each chunk, Idiomorph morphs the existing DOM to match the new HTML — preserving interactive state, animations, and scroll position.
+When the CopilotKit runtime has an MCP server configured, skills enhance the agent's output quality:
 
-The flow works like this:
+1. Runtime connects to MCP server at startup (\`mcpApps.servers\` config)
+2. Agent can read skill resources (\`skills://master-agent-playbook\`)
+3. Agent follows skill rules: response decision tree, 3-layer pattern, SVG rules
+4. For external tools (Claude Desktop, Cursor), the MCP server also exposes:
+   - **Prompts**: Pre-composed skill instructions (\`create_widget\`, \`create_svg_diagram\`)
+   - **Tools**: \`assemble_document\` wraps HTML with the full design system
 
-1. Agent starts streaming HTML → Empty iframe shell loaded
-2. Each HTML chunk → Sent via \`postMessage\` to the iframe
-3. Inside the iframe → Idiomorph morphs the DOM (minimal changes)
-4. Agent finishes → Final HTML applied, export overlay appears
+The skills layer is what ensures consistent visual quality — without it, the agent would produce inconsistent styling and miss design system variables.`,
+    },
+    {
+      type: "markdown",
+      id: "flow-state-sync",
+      content: `## State Sync Flow
 
-## Import Maps
+For todo interactions, the state flows bidirectionally:
 
-The iframe includes import maps so widgets can use ES modules directly:`,
+**User edits a todo:**
+1. User clicks checkbox → \`agent.setState({ todos: updatedList })\`
+2. CopilotKit syncs new state to LangGraph agent backend
+3. Agent sees the update in its next tool call via \`runtime.state.todos\`
+
+**Agent adds a todo:**
+1. Agent calls \`manage_todos([...existingTodos, newTodo])\`
+2. LangGraph \`Command(update={todos: [...]})\` updates agent state
+3. CopilotKit syncs back to frontend → \`agent.state.todos\` updates
+4. React re-renders the todo list
+
+Both directions use the same state object — there's no separate frontend vs. backend state.`,
     },
     {
       type: "code",
-      id: "widget-imports",
-      language: "html",
-      filename: "Import map (injected into iframe head)",
-      content: `<script type="importmap">
-{
-  "imports": {
-    "three": "https://esm.sh/three@0.170.0",
-    "three/addons/": "https://esm.sh/three@0.170.0/examples/jsm/",
-    "gsap": "https://esm.sh/gsap@3.12.7",
-    "d3": "https://esm.sh/d3@7.9.0",
-    "chart.js": "https://esm.sh/chart.js@4.4.7",
-    "chart.js/auto": "https://esm.sh/chart.js@4.4.7/auto"
-  }
-}
-</script>`,
+      id: "flow-config",
+      language: "typescript",
+      filename: "Complete CopilotKit runtime configuration",
+      content: `// apps/app/src/app/api/copilotkit/route.ts
+const defaultAgent = new LangGraphHttpAgent({
+  deploymentUrl: process.env.LANGGRAPH_DEPLOYMENT_URL || "http://localhost:8123",
+  agentName: "sample_agent",
+});
+
+const runtime = new CopilotRuntime({
+  agents: { default: defaultAgent },
+  a2ui: { injectA2UITool: true },
+  mcpApps: {
+    servers: process.env.MCP_SERVER_URL ? [{
+      type: "http",
+      url: process.env.MCP_SERVER_URL,
+      serverId: "example_mcp_app",
+    }] : [],
+  },
+});
+
+// apps/agent/main.py
+agent = create_deep_agent(
+    model=ChatOpenAI(model="gpt-5.4-2026-03-05"),
+    tools=[query_data, plan_visualization, *todo_tools, generate_form],
+    middleware=[CopilotKitMiddleware()],
+    context_schema=AgentState,
+    skills=[str(Path(__file__).parent / "skills")],
+    checkpointer=BoundedMemorySaver(max_threads=200),
+    system_prompt="...",
+)`,
     },
     {
       type: "playground",
-      id: "widget-playground",
-      title: "Try it: Mini Widget Renderer",
+      id: "flow-playground",
+      title: "Try it: Full Pipeline Simulation",
       files: {
-        "/App.js": `import { useState, useRef, useEffect } from "react";
+        "/App.js": `import { useState, useEffect } from "react";
 
-const defaultHTML = \`<div style="font-family: 'Plus Jakarta Sans', sans-serif; padding: 24px;">
-  <h2 style="font-size: 20px; font-weight: 700;
-    background: linear-gradient(135deg, #9599CC, #1B936F);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
-    Hello from the Widget!
-  </h2>
-  <p style="color: #6b7280; font-size: 14px;">
-    This HTML is rendered in an iframe, just like the real widget renderer.
-  </p>
-  <div style="display: flex; gap: 8px; margin-top: 16px;">
-    <div style="width: 60px; height: 60px; border-radius: 12px;
-      background: linear-gradient(135deg, #BEC2FF, #85E0CE);
-      animation: pulse 2s ease-in-out infinite;" />
-    <div style="width: 60px; height: 60px; border-radius: 12px;
-      background: linear-gradient(135deg, #85E0CE, #BEC2FF);
-      animation: pulse 2s ease-in-out infinite 0.3s;" />
-    <div style="width: 60px; height: 60px; border-radius: 12px;
-      background: linear-gradient(135deg, #9599CC, #A8E9DC);
-      animation: pulse 2s ease-in-out infinite 0.6s;" />
-  </div>
-  <style>
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(0.9); opacity: 0.7; }
-    }
-  </style>
-</div>\`;
+// Simulates the complete end-to-end flow
+const pipeline = [
+  { layer: "Frontend", action: "User sends message", detail: '"Show me a solar system"', icon: "💬" },
+  { layer: "CopilotKit", action: "Routes to LangGraph agent", detail: "POST /api/copilotkit → localhost:8123", icon: "🔌" },
+  { layer: "Deep Agent", action: "Acknowledges request", detail: '"I\'ll create an interactive solar system visualization."', icon: "🧠" },
+  { layer: "Deep Agent", action: "Calls plan_visualization", detail: "approach: '3D orbital sim', tech: 'Three.js'", icon: "📋" },
+  { layer: "CopilotKit", action: "Renders PlanCard", detail: "useRenderTool renders component in chat", icon: "🔌" },
+  { layer: "Deep Agent", action: "Calls widgetRenderer", detail: "html: '<div id=\\"scene\\">...</div><script type=\\"module\\">...'", icon: "🧠" },
+  { layer: "Widget Renderer", action: "Assembles iframe shell", detail: "Theme CSS + Bridge JS + Import Map", icon: "🖼" },
+  { layer: "Widget Renderer", action: "Streams HTML via postMessage", detail: "Idiomorph morphs DOM, scripts execute sequentially", icon: "🖼" },
+  { layer: "Widget Renderer", action: "Auto-resize complete", detail: "Height: 450px, streaming settled", icon: "🖼" },
+  { layer: "Deep Agent", action: "Narrates result", detail: '"The visualization shows planets orbiting..."', icon: "🧠" },
+];
+
+const layerColors = {
+  "Frontend":        { bg: "#f0fdf4", border: "#a7f3d0", text: "#166534" },
+  "CopilotKit":      { bg: "#f5f3ff", border: "#c4b5fd", text: "#5b21b6" },
+  "Deep Agent":      { bg: "#eff6ff", border: "#93c5fd", text: "#1e40af" },
+  "Widget Renderer": { bg: "#fff7ed", border: "#fdba74", text: "#9a3412" },
+};
 
 export default function App() {
-  const [html, setHtml] = useState(defaultHTML);
-  const iframeRef = useRef(null);
+  const [step, setStep] = useState(-1);
+  const [running, setRunning] = useState(false);
 
-  useEffect(() => {
-    if (!iframeRef.current) return;
-    const doc = iframeRef.current.contentDocument;
-    if (!doc) return;
-    doc.open();
-    doc.write(\`<!DOCTYPE html>
-<html>
-<head>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-</head>
-<body style="margin:0;background:transparent;">\${html}</body>
-</html>\`);
-    doc.close();
-  }, [html]);
+  const run = async () => {
+    setRunning(true);
+    setStep(-1);
+    for (let i = 0; i < pipeline.length; i++) {
+      await new Promise(r => setTimeout(r, 700));
+      setStep(i);
+    }
+    setRunning(false);
+  };
 
   return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            padding: "8px 12px", fontSize: 12, fontWeight: 600,
-            background: "#f9fafb", borderBottom: "1px solid #e5e7eb",
-            color: "#6b7280",
-          }}>
-            Edit HTML
-          </div>
-          <textarea
-            value={html}
-            onChange={(e) => setHtml(e.target.value)}
-            style={{
-              width: "100%", height: 180, padding: 12, border: "none",
-              fontFamily: "'SF Mono', 'Fira Code', monospace", fontSize: 12,
-              lineHeight: 1.6, resize: "none", outline: "none",
-              background: "#fff",
-            }}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{
-            padding: "8px 12px", fontSize: 12, fontWeight: 600,
-            background: "#f9fafb", borderBottom: "1px solid #e5e7eb",
-            borderTop: "1px solid #e5e7eb",
-            color: "#6b7280",
-          }}>
-            Preview (sandboxed iframe)
-          </div>
-          <iframe
-            ref={iframeRef}
-            sandbox="allow-scripts"
-            style={{
-              width: "100%", height: 200, border: "none",
-              background: "#fff",
-            }}
-          />
-        </div>
+    <div style={{ fontFamily: "system-ui, sans-serif", padding: 20 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>
+        End-to-End Flow
+      </h2>
+      <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
+        Watch a user message flow through all four layers.
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+        {pipeline.map((s, i) => {
+          const active = i <= step;
+          const c = layerColors[s.layer];
+          return (
+            <div key={i} style={{
+              display: "flex", gap: 10, padding: "8px 12px", borderRadius: 8,
+              background: active ? c.bg : "#fafafa",
+              border: \`1px solid \${active ? c.border : "#f0f0f0"}\`,
+              opacity: active ? 1 : 0.3,
+              transition: "all 0.3s ease",
+              fontSize: 13,
+            }}>
+              <span style={{ fontSize: 16 }}>{s.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, color: active ? c.text : "#9ca3af" }}>
+                  {s.layer}: {s.action}
+                </div>
+                <div style={{
+                  fontSize: 11, fontFamily: "monospace",
+                  color: active ? "#6b7280" : "#d1d5db", marginTop: 2,
+                }}>
+                  {s.detail}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
+
+      <button onClick={run} disabled={running} style={{
+        padding: "8px 16px", borderRadius: 8, border: "none",
+        background: running ? "#d1d5db" : "linear-gradient(135deg, #9599CC, #1B936F)",
+        color: "#fff", cursor: running ? "default" : "pointer",
+        fontWeight: 600, fontSize: 13,
+      }}>
+        {running ? "Running..." : "Trace Full Pipeline"}
+      </button>
     </div>
   );
 }`,
@@ -199,20 +197,18 @@ export default function App() {
     },
     {
       type: "markdown",
-      id: "widget-conclusion",
-      content: `## What's Next?
+      id: "flow-extend",
+      content: `## Extending the Template
 
-You've now seen the core building blocks of OpenGenerativeUI:
+To add your own domain to OpenGenerativeUI:
 
-1. **Agent State** — State lives in the agent, syncs bidirectionally
-2. **Generative UI** — Agent renders React components, not just text
-3. **CopilotKit Hooks** — \`useAgent\`, \`useComponent\`, \`useFrontendTool\`, and more
-4. **Frontend Tools** — Agent calls JavaScript in the browser
-5. **Widget Renderer** — Sandboxed iframe for arbitrary HTML/SVG/3D content
+1. **Define state** — Add fields to \`AgentState\` in \`todos.py\` (or create a new schema)
+2. **Create tools** — Write LangGraph tools that return \`Command(update={...})\` to modify state
+3. **Register components** — Use \`useComponent()\` in the frontend to register UI for agent tool calls
+4. **Write skills** — Add \`.txt\` playbooks to guide the agent's visual output quality
+5. **Configure the system prompt** — Define your mandatory workflow steps
 
-To get started with your own project, fork the repo and follow the setup instructions in the README. The todo list is a great starting point — extend it with categories, priorities, due dates, or replace it entirely with your own domain.
-
-Happy building!`,
+The todo list is the starting point — replace it with your domain (project tracker, inventory, scheduling, etc.) while keeping the same CopilotKit v2 state pattern.`,
     },
   ],
 };
