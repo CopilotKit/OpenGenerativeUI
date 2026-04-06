@@ -6,6 +6,7 @@
     "dev:app": "turbo run dev --filter='@repo/app'",
     "dev:agent": "cd apps/agent && uv sync && uv run uvicorn main:app --host 0.0.0.0 --port 8123 --reload",
     "dev:mcp": "turbo run dev --filter='open-generative-ui-mcp'",
+    "dev:notebook": "turbo run dev --filter='@repo/notebook'",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "clean": "turbo run clean"
