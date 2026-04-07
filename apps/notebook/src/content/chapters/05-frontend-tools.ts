@@ -77,27 +77,41 @@ The principle: **Show, don't just tell.** Before writing any response:
       id: "skills-decision-tree",
       content: `## The Response Decision Tree
 
-The master playbook teaches the agent to choose the right output format based on what the user is asking:
+The master playbook teaches the agent to choose the right output format based on what the user is asking:`,
+    },
+    {
+      type: "mermaid",
+      id: "skills-decision-diagram",
+      title: "Skill Decision Tree",
+      content: `flowchart TD
+    Q[User asks a question] --> F{Question type?}
+    F -->|Quick factual| T[1-2 sentences of text]
+    F -->|Conceptual| C{Sub-type?}
+    F -->|Build me X| A[Working code artifact]
+    F -->|Comparison| S[Side-by-side visual]
+    F -->|Emotional| W[Warm text only]
 
-\`\`\`
-User asks a question
-  |
-  +-- Quick factual answer?  →  1-2 sentences of text
-  |
-  +-- Conceptual / "how does X work"?
-  |     +-- Spatial or visual?       →  SVG diagram
-  |     +-- Process or flow?         →  Flowchart or HTML stepper
-  |     +-- Data-driven?             →  Interactive chart
-  |     +-- Abstract but explorable? →  Interactive widget with controls
-  |
-  +-- "Build me X"?  →  Working code artifact
-  |
-  +-- Comparison?    →  Side-by-side visual
-  |
-  +-- Emotional?     →  Warm text only, no visuals
-\`\`\`
+    C -->|Spatial / visual| SVG[SVG diagram]
+    C -->|Process / flow| FL[Flowchart or stepper]
+    C -->|Data-driven| CH[Interactive chart]
+    C -->|Abstract| WI[Widget with controls]
 
-The playground below shows this in action — pick different question types and see the skill guide the agent to produce different output formats:`,
+    style Q fill:#EDE9F5,stroke:#5B3FA0,color:#3E2B6F
+    style F fill:#FAEEDA,stroke:#B8860B,color:#854F0B
+    style C fill:#FAEEDA,stroke:#B8860B,color:#854F0B
+    style T fill:#f7f6f3,stroke:#9c9a92,color:#1a1a1a
+    style A fill:#E1F5EE,stroke:#0F6E56,color:#085041
+    style S fill:#E3EFFC,stroke:#2663B3,color:#1A4680
+    style W fill:#f7f6f3,stroke:#9c9a92,color:#1a1a1a
+    style SVG fill:#E1F5EE,stroke:#0F6E56,color:#085041
+    style FL fill:#E1F5EE,stroke:#0F6E56,color:#085041
+    style CH fill:#E3EFFC,stroke:#2663B3,color:#1A4680
+    style WI fill:#E3EFFC,stroke:#2663B3,color:#1A4680`,
+    },
+    {
+      type: "markdown",
+      id: "skills-decision-tree-cta",
+      content: `The playground below shows this in action — pick different question types and see the skill guide the agent to produce different output formats:`,
     },
     {
       type: "playground",

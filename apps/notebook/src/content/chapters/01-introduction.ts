@@ -20,13 +20,26 @@ The agent produces charts, 3D scenes, SVG diagrams, and interactive widgets that
       id: "intro-arch",
       content: `## Architecture
 
-Three systems work together:
+Three systems work together in a layered architecture:`,
+    },
+    {
+      type: "mermaid",
+      id: "intro-arch-diagram",
+      title: "System Architecture",
+      content: `graph TD
+    User([User]) -->|chat message| CK[CopilotKit\nReact hooks + runtime]
+    CK -->|forwards to agent| DA[Deep Agent\nLangGraph + tools + skills]
+    DA -->|tool calls| Tools{Tools}
+    Tools -->|plan_visualization| DA
+    Tools -->|widgetRenderer| WR[Widget Renderer\nSandboxed iframe + Idiomorph]
+    Tools -->|pieChart / barChart| WR
+    WR -->|renders in browser| User
 
-| Layer | Tech | Role |
-|-------|------|------|
-| **Widget Renderer** | Sandboxed iframe, Idiomorph | Renders agent-generated HTML/SVG/3D in the browser |
-| **CopilotKit** | React hooks, runtime API | Bridges the React frontend to the agent backend |
-| **Deep Agent** | LangGraph, \`create_deep_agent\` | Orchestrates tools, manages state, follows a mandatory visualization workflow |`,
+    style CK fill:#EDE9F5,stroke:#5B3FA0,color:#3E2B6F
+    style DA fill:#E3EFFC,stroke:#2663B3,color:#1A4680
+    style WR fill:#E1F5EE,stroke:#0F6E56,color:#085041
+    style User fill:#f7f6f3,stroke:#9c9a92,color:#1a1a1a
+    style Tools fill:#FAEEDA,stroke:#B8860B,color:#854F0B`,
     },
     {
       type: "code",

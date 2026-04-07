@@ -17,6 +17,18 @@ const PlaygroundCell = dynamic(
   }
 );
 
+const MermaidCell = dynamic(
+  () => import("./mermaid-cell").then((m) => m.MermaidCell),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="notebook-cell overflow-hidden" style={{ minHeight: 200 }}>
+        <div className="shimmer-loading w-full h-full" style={{ minHeight: 200 }} />
+      </div>
+    ),
+  }
+);
+
 export function CellRenderer({ cell }: { cell: Cell }) {
   switch (cell.type) {
     case "markdown":
@@ -37,5 +49,7 @@ export function CellRenderer({ cell }: { cell: Cell }) {
           title={cell.title}
         />
       );
+    case "mermaid":
+      return <MermaidCell content={cell.content} title={cell.title} />;
   }
 }

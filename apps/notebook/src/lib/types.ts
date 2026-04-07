@@ -21,7 +21,14 @@ export type PlaygroundCell = {
   title?: string;
 };
 
-export type Cell = MarkdownCell | CodeCell | PlaygroundCell;
+export type MermaidCell = {
+  type: "mermaid";
+  id: string;
+  content: string;
+  title?: string;
+};
+
+export type Cell = MarkdownCell | CodeCell | PlaygroundCell | MermaidCell;
 
 export type Chapter = {
   id: string;
