@@ -12,7 +12,7 @@ export const fullFlow: Chapter = {
       id: "flow-overview",
       content: `# Putting It Together
 
-Now let's trace the **complete flow** in one working demo. Type a message, and watch it flow through all four layers — ending with a real rendered widget in an iframe.`,
+Now let's trace the **complete flow** in one working demo. Pick a prompt, and watch it flow through all three layers — ending with a real rendered widget in an iframe.`,
     },
     {
       type: "playground",
@@ -246,8 +246,7 @@ To add your own domain:
 1. **Define state** — Add fields to \`AgentState\` in Python
 2. **Create tools** — Return \`Command(update={...})\` to modify state
 3. **Register components** — Use \`useComponent()\` for agent-renderable UI
-4. **Write skills** — Add \`.txt\` playbooks for visual quality
-5. **Configure the system prompt** — Define your mandatory workflow
+4. **Configure the system prompt** — Define your mandatory workflow
 
 The todo list is the starting point — replace it with your domain while keeping the same CopilotKit v2 state pattern.`,
     },

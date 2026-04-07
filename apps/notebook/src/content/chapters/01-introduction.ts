@@ -13,21 +13,20 @@ export const introduction: Chapter = {
 
 OpenGenerativeUI is an open-source template showing how an AI agent can **generate rich, interactive UI** — not just text — using [CopilotKit](https://copilotkit.ai) and [LangGraph](https://langchain-ai.github.io/langgraph/).
 
-The agent produces charts, 3D scenes, SVG diagrams, and interactive widgets that render directly in the chat stream. Users and the agent share the same application state, and the agent is guided by composable **skill documents** that define visual quality standards.`,
+The agent produces charts, 3D scenes, SVG diagrams, and interactive widgets that render directly in the chat stream. Users and the agent share the same application state.`,
     },
     {
       type: "markdown",
       id: "intro-arch",
       content: `## Architecture
 
-Four systems work together:
+Three systems work together:
 
 | Layer | Tech | Role |
 |-------|------|------|
 | **Widget Renderer** | Sandboxed iframe, Idiomorph | Renders agent-generated HTML/SVG/3D in the browser |
 | **CopilotKit** | React hooks, runtime API | Bridges the React frontend to the agent backend |
-| **Deep Agent** | LangGraph, \`create_deep_agent\` | Orchestrates tools, manages state, follows a mandatory visualization workflow |
-| **MCP Skills** | MCP server, \`.txt\` playbooks | Provides composable design system rules and rendering instructions |`,
+| **Deep Agent** | LangGraph, \`create_deep_agent\` | Orchestrates tools, manages state, follows a mandatory visualization workflow |`,
     },
     {
       type: "code",
@@ -44,22 +43,13 @@ Four systems work together:
 │       │   └── use-generative-ui-examples.tsx  # CopilotKit hook registrations
 │       └── app/
 │           └── api/copilotkit/route.ts   # CopilotKit runtime (connects to agent)
-├── agent/                  # LangGraph Python agent
-│   ├── main.py             # create_deep_agent + system prompt
-│   ├── skills/             # Agent skill documents (loaded at runtime)
-│   └── src/
-│       ├── todos.py        # AgentState schema + todo tools
-│       ├── plan.py         # Mandatory plan_visualization tool
-│       ├── query.py        # Data query tool
-│       └── bounded_memory_saver.py  # FIFO thread eviction
-└── mcp/                    # MCP design system server
-    ├── src/
-    │   ├── server.ts       # Resources, prompts, tools
-    │   └── renderer.ts     # Theme CSS + bridge JS assembly
-    └── skills/             # Playbook .txt files
-        ├── master-agent-playbook.txt
-        ├── svg-diagram-skill.txt
-        └── agent-skills-vol2.txt`,
+└── agent/                  # LangGraph Python agent
+    ├── main.py             # create_deep_agent + system prompt
+    └── src/
+        ├── todos.py        # AgentState schema + todo tools
+        ├── plan.py         # Mandatory plan_visualization tool
+        ├── query.py        # Data query tool
+        └── bounded_memory_saver.py  # FIFO thread eviction`,
     },
     {
       type: "markdown",
