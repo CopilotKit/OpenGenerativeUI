@@ -3,7 +3,7 @@ import {
   ExperimentalEmptyAdapter,
   copilotRuntimeNextJSAppRouterEndpoint,
 } from "@copilotkit/runtime";
-import { LangGraphHttpAgent } from "@copilotkit/runtime/langgraph";
+import { LangGraphAgent, LangGraphHttpAgent } from "@copilotkit/runtime/langgraph";
 import { NextRequest } from "next/server";
 
 // Simple in-memory sliding-window rate limiter (per IP)
@@ -44,9 +44,18 @@ const deploymentUrl = !raw
     : `http://${raw}`;
 
 // 1. Define the agent connection to LangGraph
-const defaultAgent = new LangGraphHttpAgent({
-  url: deploymentUrl,
-});
+// LangGraphAgent talks the native LangGraph SDK API (for LangGraph Platform / Cloud).
+// LangGraphHttpAgent talks the AG-UI HTTP protocol (for self-hosted FastAPI server).
+const usePlatform = !!process.env.LANGSMITH_API_KEY;
+const defaultAgent = usePlatform
+  ? new LangGraphAgent({
+      deploymentUrl: deploymentUrl,
+      graphId: "sample_agent",
+      langsmithApiKey: process.env.LANGSMITH_API_KEY,
+    })
+  : new LangGraphHttpAgent({
+      url: deploymentUrl,
+    });
 
 // 3. Define the route and CopilotRuntime for the agent
 export const POST = async (req: NextRequest) => {
