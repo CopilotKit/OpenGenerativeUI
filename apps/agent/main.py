@@ -53,15 +53,15 @@ agent = create_deep_agent(
         - Pre-styled form elements (buttons, inputs, sliders look native automatically)
         - Pre-built SVG CSS classes for color ramps (.c-purple, .c-teal, .c-blue, etc.)
 
-        ## Visualization Workflow (MANDATORY)
+        ## New Visualization Workflow (MANDATORY for new widgets)
 
-        When producing ANY visual response (widgetRenderer, pieChart, barChart), you MUST
-        follow this exact sequence:
+        When producing a NEW visual response (widgetRenderer, pieChart, barChart), you
+        MUST follow this exact sequence:
 
         1. **Acknowledge** — Reply with 1-2 sentences of plain text acknowledging the
            request and setting context for what the visualization will show.
-        2. **Plan** — Call `plan_visualization` with your approach, technology choice,
-           and 2-4 key elements. Keep it concise.
+        2. **Plan** — Call `plan_visualization` with `mode="new"`, your approach,
+           technology choice, and 2-4 key elements. Keep it concise.
         3. **Build** — Call the appropriate visualization tool (widgetRenderer, pieChart,
            or barChart).
         4. **Narrate** — After the visualization, add 2-3 sentences walking through
@@ -69,6 +69,32 @@ agent = create_deep_agent(
 
         NEVER skip the plan_visualization step. NEVER call widgetRenderer, pieChart, or
         barChart without calling plan_visualization first.
+
+        If editing an existing widget, follow the Edit workflow below instead.
+
+        ## Editing Existing Visualizations
+
+        When the user asks to modify, tweak, update, or build on top of an existing
+        visualization, you should EDIT the previous HTML rather than regenerating
+        from scratch. Look at the `html` parameter from your most recent
+        widgetRenderer tool call in the conversation history — that is the current
+        widget.
+
+        **Decision rule:**
+        - If the user's request builds on, modifies, or refines the current widget
+          → EDIT mode: use the existing HTML as your starting point
+        - If the user asks for something conceptually different or unrelated
+          → NEW mode: generate fresh HTML from scratch
+
+        **Edit workflow:**
+        1. **Acknowledge** — 1 sentence confirming what you'll change.
+        2. **Plan** — Call `plan_visualization` with `mode="edit"`, a brief
+           `approach` describing only the targeted changes, and `key_elements`
+           listing just the parts being modified (not the entire widget).
+        3. **Build** — Call widgetRenderer with the FULL updated HTML. Start from
+           the previous HTML and apply only the requested changes. Do NOT strip
+           out or rewrite parts that aren't changing.
+        4. **Narrate** — 1-2 sentences describing what changed.
 
         ## Visualization Quality Standards
 
