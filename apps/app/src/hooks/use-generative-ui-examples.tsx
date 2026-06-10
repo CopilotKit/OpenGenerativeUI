@@ -13,7 +13,6 @@ import {
 // Generative UI imports
 import { PieChart, PieChartProps } from "@/components/generative-ui/charts/pie-chart";
 import { BarChart, BarChartProps } from "@/components/generative-ui/charts/bar-chart";
-import { WidgetRenderer, WidgetRendererProps } from "@/components/generative-ui/widget-renderer";
 import { MeetingTimePicker } from "@/components/generative-ui/meeting-time-picker";
 import { ToolReasoning } from "@/components/tool-rendering";
 import { PlanCard } from "@/components/generative-ui/plan-card";
@@ -48,19 +47,6 @@ export const useGenerativeUIExamples = () => {
     description: "Controlled Generative UI that displays data as a bar chart.",
     parameters: BarChartProps,
     render: BarChart,
-  });
-
-  // --------------------------
-  // 🪁 Widget Renderer: Sandboxed HTML/SVG visualizations
-  // --------------------------
-  useComponent({
-    name: "widgetRenderer",
-    description:
-      "Renders interactive HTML/SVG visualizations in a sandboxed iframe. " +
-      "Use for algorithm visualizations, diagrams, interactive widgets, " +
-      "simulations, math plots, and any visual explanation.",
-    parameters: WidgetRendererProps,
-    render: WidgetRenderer,
   });
 
   // --------------------------

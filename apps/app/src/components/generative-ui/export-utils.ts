@@ -1,4 +1,9 @@
-import { THEME_CSS, SVG_CLASSES_CSS, FORM_STYLES_CSS } from "./widget-renderer";
+import {
+  THEME_CSS,
+  SVG_CLASSES_CSS,
+  FORM_STYLES_WITH_STAGGER_CSS as FORM_STYLES_CSS,
+  IMPORTMAP_SCRIPT_TAG,
+} from "@repo/design-system";
 
 const CHART_COLORS = [
   "#3b82f6",
@@ -10,57 +15,74 @@ const CHART_COLORS = [
   "#f97316",
 ];
 
-// Import map matching widget-renderer's assembleShell — allows widgets that
-// use bare specifiers (e.g. `import * as THREE from "three"`) to work standalone.
-const IMPORT_MAP = `<script type="importmap">
-  {
-    "imports": {
-      "three": "https://esm.sh/three",
-      "three/": "https://esm.sh/three/",
-      "gsap": "https://esm.sh/gsap",
-      "gsap/": "https://esm.sh/gsap/",
-      "d3": "https://esm.sh/d3",
-      "d3/": "https://esm.sh/d3/",
-      "chart.js": "https://esm.sh/chart.js",
-      "chart.js/": "https://esm.sh/chart.js/"
-    }
-  }
-  </script>`;
+export interface StandaloneActivityContent {
+  css?: string;
+  html?: string[];
+  jsFunctions?: string;
+  jsExpressions?: string[];
+}
+
+const WEBSANDBOX_STUB = `window.Websandbox = { connection: { remote: { sendPrompt: async () => {}, openLink: async ({ url }) => { if (/^https:/.test(url)) window.open(url, "_blank", "noopener,noreferrer"); } } } };`;
+
+function escapeScriptClose(js: string): string {
+  return js.replace(/<\/script/gi, "<\\/script");
+}
+
+function escapeStyleClose(css: string): string {
+  return css.replace(/<\/style/gi, "<\\/style");
+}
 
 /**
- * Wrap a raw HTML fragment (the same string passed to WidgetRenderer)
- * in a standalone document that works when opened in a browser.
+ * Wrap an open-generative-ui activity payload in a standalone document that
+ * works when opened in a browser: importmap first, then the same design-system
+ * css composition the live renderer injects, then the generated css, a
+ * Websandbox stub so exported bridge calls degrade gracefully, the joined html
+ * chunks, and finally the generated js in ONE classic (non-module) script:
+ * jsFunctions at top level — so function declarations become window globals,
+ * matching the live websandbox rail where inline onclick="fn()" handlers
+ * resolve them — followed by the jsExpressions inside an async IIFE so they
+ * can use `await` (dynamic import() still resolves via the importmap in
+ * classic scripts).
  */
-export function assembleStandaloneHtml(html: string, title: string): string {
+export function assembleStandaloneHtmlFromActivity(
+  content: StandaloneActivityContent,
+  title = "generated-widget"
+): string {
+  const body = content.html?.join("") ?? "";
+  const expressions = content.jsExpressions ?? [];
+  const scriptParts = [
+    ...(content.jsFunctions ? [escapeScriptClose(content.jsFunctions)] : []),
+    ...(expressions.length > 0
+      ? [
+          `(async () => {
+${expressions.map(escapeScriptClose).join("\n")}
+})();`,
+        ]
+      : []),
+  ];
+  const generatedScript =
+    scriptParts.length > 0
+      ? `<script>
+${scriptParts.join("\n")}
+  </script>`
+      : "";
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(title)}</title>
-  ${IMPORT_MAP}
+  ${IMPORTMAP_SCRIPT_TAG}
   <style>
     ${THEME_CSS}
     ${SVG_CLASSES_CSS}
     ${FORM_STYLES_CSS}
-  </style>
+  </style>${content.css ? `\n  <style>${escapeStyleClose(content.css)}</style>` : ""}
+  <script>${WEBSANDBOX_STUB}</script>
 </head>
 <body>
-  <div id="content">
-    ${html}
-  </div>
-  <script>
-    // Stub bridge functions so onclick="sendPrompt(...)" doesn't throw
-    window.sendPrompt = function() {};
-    window.openLink = function(url) { if (url) window.open(url, '_blank'); };
-    document.addEventListener('click', function(e) {
-      var a = e.target.closest('a[href]');
-      if (a && a.href.startsWith('http')) {
-        e.preventDefault();
-        window.open(a.href, '_blank');
-      }
-    });
-  </script>
+  ${body}
+  ${generatedScript}
 </body>
 </html>`;
 }

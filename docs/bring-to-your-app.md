@@ -68,7 +68,7 @@ export const POST = async (req: NextRequest) => {
 Install dependencies:
 
 ```bash
-pip install copilotkit langgraph langchain langchain-openai fastapi uvicorn ag-ui-langgraph deepagents
+pip install copilotkit langgraph langchain langchain-anthropic fastapi uvicorn ag-ui-langgraph deepagents
 ```
 
 Create the agent:
@@ -81,12 +81,12 @@ from fastapi import FastAPI
 from copilotkit import CopilotKitMiddleware, LangGraphAGUIAgent
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from deepagents import create_deep_agent
-from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 
 load_dotenv()
 
 agent = create_deep_agent(
-    model=ChatOpenAI(model=os.environ.get("LLM_MODEL", "gpt-5.4-2026-03-05")),
+    model=ChatAnthropic(model=os.environ.get("LLM_MODEL", "claude-fable-5")),
     tools=[],  # add your tools here
     middleware=[CopilotKitMiddleware()],
     system_prompt="You are a helpful assistant.",

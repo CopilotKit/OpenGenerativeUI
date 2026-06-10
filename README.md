@@ -21,19 +21,18 @@ All visuals are rendered in sandboxed iframes with automatic light/dark theming,
 
 ```bash
 make setup    # Install deps + create .env template
-# Edit apps/agent/.env with your real OpenAI API key
+# Edit apps/agent/.env with your real Anthropic API key
 make dev      # Start all services
 ```
 
-> **Strong models required.** Generative UI demands high-capability models that can produce complex, well-structured HTML/SVG in a single pass. Set `LLM_MODEL` in your `.env` to one of:
+> **Strong models required.** Generative UI demands high-capability models that can produce complex, well-structured HTML/SVG in a single pass. The agent runs on Anthropic Claude — `claude-fable-5` by default. Override with `LLM_MODEL` in your `.env`:
 >
-> | Model | Provider |
-> |-------|----------|
-> | `gpt-5.4` / `gpt-5.4-pro` | OpenAI |
-> | `claude-opus-4-6` | Anthropic |
-> | `gemini-3.1-pro` | Google |
+> | Model | Notes |
+> |-------|-------|
+> | `claude-fable-5` | Default |
+> | `claude-opus-4-6` | Strong alternative |
 >
-> Smaller or weaker models will produce broken layouts, missing interactivity, or incomplete visualizations.
+> Setting `LLM_MODEL` to a `gpt-*` name routes to OpenAI instead (requires `OPENAI_API_KEY`). For other providers, swap the chat model in `apps/agent/src/model.py` (see [docs/bring-to-your-app.md](docs/bring-to-your-app.md)). Smaller or weaker models will produce broken layouts, missing interactivity, or incomplete visualizations.
 
 - **App**: http://localhost:3000
 - **Agent**: http://localhost:8123
@@ -127,15 +126,17 @@ Deep agents also provide built-in planning (`write_todos`), filesystem tools, an
 
 1. **User sends a prompt** via the CopilotKit chat UI
 2. **Deep agent decides** whether to respond with text, call a tool, or render a visual component — consulting relevant skills as needed
-3. **`widgetRenderer`** — a frontend `useComponent` hook — receives the agent's HTML and renders it in a sandboxed iframe
-4. **Skeleton loading** shows while the iframe loads, then content fades in smoothly
-5. **ResizeObserver** inside the iframe reports content height back to the parent for seamless auto-sizing
+3. **`generateSandboxedUi`** — the canonical tool the CopilotKit runtime exposes when `openGenerativeUI` is enabled — receives the UI as ordered streaming parameters: `initialHeight` → `placeholderMessages` → `css` → `html` → `jsFunctions` → `jsExpressions`
+4. **`OpenGenerativeUIMiddleware`** in the runtime translates the streaming tool call into `open-generative-ui` activity events the frontend subscribes to
+5. **The demo's activity renderer** (registered via `renderActivityMessages`) shows the html streaming in live — morphing each update into a preview iframe with Idiomorph so nothing flickers — then boots the final websandbox iframe with the shared design-system CSS and CDN importmap injected
+6. **Sandbox bridge + autosize** — the generated UI calls back into the host through Zod-validated `sendPrompt`/`openLink` sandbox functions, and a ResizeObserver inside the iframe continuously reports content height for seamless auto-sizing
 
 ### Key CopilotKit Patterns
 
-| Pattern | Hook | Example |
-|---------|------|---------|
-| Generative UI | `useComponent` | Pie charts, bar charts, widget renderer |
+| Pattern | Hook / Option | Example |
+|---------|---------------|---------|
+| Open Generative UI | `openGenerativeUI` + `renderActivityMessages` | Streaming sandboxed widgets via `generateSandboxedUi` |
+| Generative UI | `useComponent` | Pie charts, bar charts |
 | Frontend tools | `useFrontendTool` | Theme toggle |
 | Human-in-the-loop | `useHumanInTheLoop` | Meeting scheduler |
 | Default tool render | `useDefaultRenderTool` | Tool execution status |

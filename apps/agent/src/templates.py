@@ -82,6 +82,19 @@ def _load_seed_html() -> None:
 _load_seed_html()
 
 
+# Appended to every apply_template payload: template HTML is a style
+# reference saved as a single string, so it may bundle idioms that the
+# canonical generateSandboxedUi contract splits across parameters.
+TEMPLATE_USAGE_NOTE = (
+    "This template HTML is a style reference only. When regenerating via "
+    "generateSandboxedUi: move any <style> block content into the css parameter "
+    "(the html parameter must not contain <style> blocks); put behavior in "
+    "jsFunctions/jsExpressions; and send prompts through the sandbox bridge — "
+    "await Websandbox.connection.remote.sendPrompt({ text }) — never a bare "
+    "sendPrompt(...) call."
+)
+
+
 @tool
 def save_template(
     name: str,
@@ -149,7 +162,7 @@ def list_templates(runtime: ToolRuntime):
 def apply_template(runtime: ToolRuntime, name: str = "", template_id: str = ""):
     """
     Retrieve a saved template's HTML so you can adapt it with new data.
-    After calling this, generate a NEW widget in the same style and render via widgetRenderer.
+    After calling this, generate a NEW widget in the same style and render via generateSandboxedUi.
 
     This tool automatically checks for a pending_template in state (set by the
     frontend when the user picks a template from the library). If pending_template
@@ -180,6 +193,7 @@ def apply_template(runtime: ToolRuntime, name: str = "", template_id: str = ""):
                     "description": t["description"],
                     "html": t["html"],
                     "data_description": t.get("data_description", ""),
+                    "usage_note": TEMPLATE_USAGE_NOTE,
                 }
         return {"error": f"Template with id '{template_id}' not found"}
 
@@ -193,6 +207,7 @@ def apply_template(runtime: ToolRuntime, name: str = "", template_id: str = ""):
                 "description": t["description"],
                 "html": t["html"],
                 "data_description": t.get("data_description", ""),
+                "usage_note": TEMPLATE_USAGE_NOTE,
             }
         return {"error": f"No template named '{name}' found"}
 

@@ -16,12 +16,15 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.6"
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Optional fallback: set LLM_MODEL to a gpt-* name to route to OpenAI
       - key: OPENAI_API_KEY
         sync: false
       - key: LANGSMITH_API_KEY
         sync: false
       - key: LLM_MODEL
-        value: gpt-5.4-2026-03-05
+        value: claude-fable-5
     buildFilter:
       paths:
         - apps/agent/**
@@ -36,7 +39,8 @@ services:
       maxInstances: 3
       targetMemoryPercent: 80
       targetCPUPercent: 70
-    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @repo/app build
+    # turbo's build task dependsOn ^build, so @repo/design-system dist/ is built before the app
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm exec turbo run build --filter=@repo/app
     startCommand: pnpm --filter @repo/app start
     healthCheckPath: /api/health
     envVars:
@@ -60,6 +64,7 @@ services:
     buildFilter:
       paths:
         - apps/app/**
+        - packages/design-system/**
         - package.json
         - pnpm-lock.yaml
         - turbo.json

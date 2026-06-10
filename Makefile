@@ -8,7 +8,7 @@ install: ## Install all dependencies (Node + Python)
 
 setup: install ## Full setup: install deps and create .env from template
 	@if [ ! -f apps/agent/.env ]; then \
-		echo "OPENAI_API_KEY=your-key-here" > apps/agent/.env; \
+		echo "ANTHROPIC_API_KEY=your-key-here" > apps/agent/.env; \
 		echo "Created apps/agent/.env — add your OpenAI API key"; \
 	else \
 		echo "apps/agent/.env already exists, skipping"; \

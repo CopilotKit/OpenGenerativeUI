@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect, type ReactNode } from "react";
 import {
-  assembleStandaloneHtml,
   chartToStandaloneHtml,
   triggerDownload,
   slugify,
@@ -12,7 +11,7 @@ interface ExportOverlayProps {
   title: string;
   html?: string;
   componentData?: Record<string, unknown>;
-  componentType: string;
+  componentType: "openGenUI" | "barChart" | "pieChart";
   ready?: boolean;
   children: ReactNode;
 }
@@ -43,8 +42,8 @@ export function ExportOverlay({
   }, [menuOpen]);
 
   const exportHtml = useMemo(() => {
-    if (componentType === "widgetRenderer" && html) {
-      return assembleStandaloneHtml(html, title);
+    if (componentType === "openGenUI" && html) {
+      return html;
     }
     if ((componentType === "barChart" || componentType === "pieChart") && componentData) {
       const chartType = componentType === "barChart" ? "bar" : "pie";
@@ -54,7 +53,7 @@ export function ExportOverlay({
       );
     }
     return null;
-  }, [componentType, html, componentData, title]);
+  }, [componentType, html, componentData]);
 
   const handleDownload = useCallback(() => {
     if (!exportHtml) return;
@@ -64,7 +63,7 @@ export function ExportOverlay({
   }, [exportHtml, title]);
 
   const handleCopy = useCallback(() => {
-    const textToCopy = componentType === "widgetRenderer" ? html : exportHtml;
+    const textToCopy = exportHtml;
     if (!textToCopy) return;
     navigator.clipboard.writeText(textToCopy).then(
       () => {
@@ -77,9 +76,10 @@ export function ExportOverlay({
         setMenuOpen(false);
       }
     );
-  }, [componentType, html, exportHtml]);
+  }, [exportHtml]);
 
-  const showTrigger = ready && exportHtml && (hovered || menuOpen);
+  const exportable = ready && !!exportHtml;
+  const showTrigger = exportable && (hovered || menuOpen);
 
   return (
     <div
@@ -87,6 +87,7 @@ export function ExportOverlay({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      {exportable && (
       <div
         className="absolute top-2 right-2 z-10 transition-opacity duration-200"
         style={{
@@ -158,6 +159,7 @@ export function ExportOverlay({
           )}
         </div>
       </div>
+      )}
 
       {children}
     </div>

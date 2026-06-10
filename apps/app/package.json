@@ -4,17 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "build": "pnpm --filter @repo/design-system build && next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ag-ui/a2ui-middleware": "^0.0.2",
     "@ag-ui/mcp-apps-middleware": "^0.0.3",
-    "@copilotkit/react-core": "next",
-    "@copilotkit/react-ui": "next",
-    "@copilotkit/runtime": "next",
-    "@copilotkitnext/shared": "next",
+    "@copilotkit/react-core": "1.55.2-next.1",
+    "@copilotkit/react-ui": "1.55.2-next.1",
+    "@copilotkit/runtime": "1.55.2-next.1",
+    "@copilotkitnext/shared": "1.54.1-next.6",
+    "@jetbrains/websandbox": "1.2.1",
+    "@repo/design-system": "workspace:*",
     "next": "16.1.6",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
@@ -26,13 +29,18 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vitest": "^4.1.8",
     "zod": "^3.23.8"
   }
 }

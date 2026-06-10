@@ -56,6 +56,49 @@ Great responses layer information:
 Never dump a visual without narration. Never narrate without visuals
 when visuals would help.
 
+This maps directly onto the mandatory tool sequence: **Acknowledge** in text,
+call `plan_visualization`, **Build** with `generateSandboxedUi`, then **Narrate**.
+
+---
+
+## The Tool Contract: generateSandboxedUi
+
+Every visual in this playbook ships through the `generateSandboxedUi` tool. The
+UI streams to the user as you generate it, so emit the parameters in this EXACT
+order:
+
+1. `initialHeight` — estimated height of the finished UI in px.
+2. `placeholderMessages` — 2-4 short, playful progress messages shown while the UI builds.
+3. `css` — ALL styles, up front. The user sees a placeholder until css is complete,
+   so keep it lean and put every style here for the css-first reveal.
+4. `html` — clean body markup, streamed in live as you write it. No `<style>`
+   blocks (the css parameter owns all styles), no monolithic inline `<script>` blocks.
+5. `jsFunctions` — named function declarations: your reusable toolbox of behavior.
+6. `jsExpressions` — an array of small statements that invoke those functions,
+   applied one-by-one so the user watches each take effect.
+
+Write parameterized generators in `jsFunctions` (`drawWing(color)`, not
+`drawRedWing()`). When the user asks for a refinement — "make the wings red" —
+a well-parameterized toolbox lets a later turn append ONE new expression instead
+of regenerating the whole document.
+
+### Sandbox Environment
+
+The UI runs in a sandboxed iframe WITHOUT same-origin access:
+
+- NO localStorage, sessionStorage, cookies, IndexedDB, or same-origin fetch.
+- Host bridge: `await Websandbox.connection.remote.sendPrompt({ text })` sends a
+  chat message on the user's behalf; `await Websandbox.connection.remote.openLink({ url })`
+  opens an https link in a new tab.
+- The design system is pre-injected: CSS variables, pre-styled form elements, and
+  `.c-*` SVG color-ramp classes. The css parameter holds widget-specific styles only.
+- An importmap is pre-injected for `three`, `gsap`, `d3`, and `chart.js` (served via
+  esm.sh). jsFunctions/jsExpressions run with classic-script semantics — top-level await
+  is a SyntaxError there. Prefer dynamic `await import(...)` inside an async function
+  declared in jsFunctions (keep jsExpressions synchronous invocations);
+  `<script type="module">` with bare specifiers also works in html when a module script
+  genuinely belongs there.
+
 ---
 
 ## Part 2: Skill — Interactive HTML Widgets
@@ -71,24 +114,26 @@ static SVGs — users can manipulate parameters and see results.
 
 ### Template: Interactive Widget with Controls
 
-```html
-<style>
-  .controls {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin: 12px 0;
-    font-size: 13px;
-    color: var(--color-text-secondary, #666);
-  }
-  .controls label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  input[type="range"] { flex: 1; }
-</style>
+css parameter:
+```css
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--color-text-secondary, #666);
+}
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+input[type="range"] { flex: 1; }
+```
 
+html parameter:
+```html
 <!-- Inline SVG drawing that responds to controls -->
 <svg width="100%" viewBox="0 0 680 400" xmlns="http://www.w3.org/2000/svg">
   <!-- Dynamic elements with IDs for JS manipulation -->
@@ -105,70 +150,87 @@ static SVGs — users can manipulate parameters and see results.
     <span id="param-label">50</span>
   </label>
 </div>
+```
 
-<script>
+jsFunctions parameter:
+```js
 function updateParam(value) {
   document.getElementById('param-label').textContent = value;
   // Modify SVG elements based on value
   const el = document.getElementById('dynamic-element');
   el.setAttribute('width', 100 + value * 2);
 }
-</script>
+```
+
+jsExpressions parameter:
+```js
+updateParam(50);
 ```
 
 ### Template: Step-Through Explainer
 
 For cyclic or staged processes (event loops, biological cycles, pipelines).
 
-```html
-<style>
-  .step-nav {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 12px 0;
-    font-size: 13px;
-  }
-  .step-nav button {
-    padding: 6px 16px;
-    border: 1px solid var(--color-border-tertiary, #ddd);
-    border-radius: 8px;
-    background: var(--color-background-secondary, #f5f5f5);
-    color: var(--color-text-primary, #333);
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .step-nav button:hover {
-    background: var(--color-background-tertiary, #eee);
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%;
-         background: var(--color-border-tertiary, #ccc);
-         transition: background 0.2s; }
-  .dot.active { background: var(--color-text-info, #185FA5); }
-  .step-content { min-height: 300px; }
-</style>
+css parameter:
+```css
+.step-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.step-nav button {
+  padding: 6px 16px;
+  border: 1px solid var(--color-border-tertiary, #ddd);
+  border-radius: 8px;
+  background: var(--color-background-secondary, #f5f5f5);
+  color: var(--color-text-primary, #333);
+  cursor: pointer;
+  font-size: 13px;
+}
+.step-nav button:hover {
+  background: var(--color-background-tertiary, #eee);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%;
+       background: var(--color-border-tertiary, #ccc);
+       transition: background 0.2s; }
+.dot.active { background: var(--color-text-info, #185FA5); }
+.step-content { min-height: 300px; }
+#dots { display: flex; gap: 6px; }
+#step-label { margin-left: auto; color: var(--color-text-secondary, #888); }
+```
 
+html parameter:
+```html
 <div class="step-content" id="step-display">
   <!-- SVG or HTML content per step, swapped by JS -->
 </div>
 
 <div class="step-nav">
   <button onclick="prevStep()">Previous</button>
-  <div id="dots" style="display:flex;gap:6px"></div>
+  <div id="dots"></div>
   <button onclick="nextStep()">Next</button>
-  <span id="step-label" style="margin-left:auto;
-        color:var(--color-text-secondary,#888)">Step 1 of 4</span>
+  <span id="step-label">Step 1 of 4</span>
 </div>
+```
 
-<script>
-const steps = [
-  { title: "Step 1", svg: `<svg>...</svg>`, desc: "What happens first" },
-  { title: "Step 2", svg: `<svg>...</svg>`, desc: "Then this" },
-  // ...
-];
-let current = 0;
+jsFunctions parameter:
+```js
+function initSteps(steps) {
+  window.steps = steps;
+  window.current = 0;
+  const dotsEl = document.getElementById('dots');
+  steps.forEach(() => {
+    const d = document.createElement('div');
+    d.className = 'dot';
+    dotsEl.appendChild(d);
+  });
+  renderStep();
+}
 
-function render() {
+function renderStep() {
+  const { steps, current } = window;
   document.getElementById('step-display').innerHTML = steps[current].svg;
   document.getElementById('step-label').textContent =
     `Step ${current + 1} of ${steps.length}`;
@@ -176,21 +238,28 @@ function render() {
     d.classList.toggle('active', i === current));
 }
 
-function nextStep() { current = (current + 1) % steps.length; render(); }
-function prevStep() { current = (current - 1 + steps.length) % steps.length; render(); }
+function nextStep() {
+  window.current = (window.current + 1) % window.steps.length;
+  renderStep();
+}
 
-// Build dots
-const dotsEl = document.getElementById('dots');
-steps.forEach(() => {
-  const d = document.createElement('div');
-  d.className = 'dot';
-  dotsEl.appendChild(d);
-});
-render();
-</script>
+function prevStep() {
+  window.current = (window.current - 1 + window.steps.length) % window.steps.length;
+  renderStep();
+}
+```
+
+jsExpressions parameter:
+```js
+initSteps([
+  { title: "Step 1", svg: `<svg>...</svg>`, desc: "What happens first" },
+  { title: "Step 2", svg: `<svg>...</svg>`, desc: "Then this" },
+]);
 ```
 
 ### CSS Animation Patterns (for live diagrams)
+
+These belong in the css parameter alongside the rest of your styles:
 
 ```css
 /* Flowing particles along a path */
@@ -261,41 +330,55 @@ For simple charts, hand-draw in SVG. No library needed.
 
 ### Approach: Chart.js (For Complex/Interactive Charts)
 
-When you need tooltips, responsive legends, animations:
+When you need tooltips, responsive legends, animations. `chart.js` is in the
+pre-injected importmap — load it with a dynamic import inside a jsFunction:
 
+html parameter:
 ```html
-<canvas id="myChart" style="width:100%;max-height:400px"></canvas>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script>
-const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-const textColor = isDark ? '#c2c0b6' : '#3d3d3a';
-const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+<div style="position:relative;width:100%;height:300px">
+  <canvas id="myChart"></canvas>
+</div>
+```
 
-new Chart(document.getElementById('myChart'), {
-  type: 'line',
-  data: {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr'],
-    datasets: [{
-      label: 'Revenue',
-      data: [30, 45, 28, 62],
-      borderColor: '#534AB7',
-      backgroundColor: 'rgba(83,74,183,0.1)',
-      fill: true,
-      tension: 0.3
-    }]
-  },
-  options: {
-    responsive: true,
-    plugins: {
-      legend: { labels: { color: textColor } }
+jsFunctions parameter:
+```js
+async function renderRevenueChart() {
+  const { default: Chart } = await import('chart.js/auto');
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const textColor = isDark ? '#c2c0b6' : '#3d3d3a';
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+
+  new Chart(document.getElementById('myChart'), {
+    type: 'line',
+    data: {
+      labels: ['Jan', 'Feb', 'Mar', 'Apr'],
+      datasets: [{
+        label: 'Revenue',
+        data: [30, 45, 28, 62],
+        borderColor: '#534AB7',
+        backgroundColor: 'rgba(83,74,183,0.1)',
+        fill: true,
+        tension: 0.3
+      }]
     },
-    scales: {
-      x: { ticks: { color: textColor }, grid: { color: gridColor } },
-      y: { ticks: { color: textColor }, grid: { color: gridColor } }
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: textColor } }
+      },
+      scales: {
+        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor }, grid: { color: gridColor } }
+      }
     }
-  }
-});
-</script>
+  });
+}
+```
+
+jsExpressions parameter:
+```js
+renderRevenueChart();
 ```
 
 ---
@@ -304,6 +387,9 @@ new Chart(document.getElementById('myChart'), {
 
 For relationship diagrams (ERDs, class diagrams, sequence diagrams) where
 precise layout math isn't worth doing by hand.
+
+Mermaid is not in the importmap — load it by URL in a module script placed in
+the html parameter (CDN script tags still work there):
 
 ```html
 <div id="diagram"></div>
@@ -412,6 +498,8 @@ later, it was worth making. If not, just use text.
 ### Quality Checklist Before Responding
 
 - [ ] Did I pick the right format? (text vs SVG vs interactive vs chart)
+- [ ] Are all styles in the css parameter and behavior split into
+      jsFunctions (toolbox) + jsExpressions (invocations)?
 - [ ] Is the visual self-explanatory even without the narration?
 - [ ] Does the narration add value beyond what the visual shows?
 - [ ] Are colors meaningful, not decorative?

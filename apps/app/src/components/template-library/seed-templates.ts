@@ -122,8 +122,8 @@ const invoiceHtml = `<style>
     </div>
   </div>
   <div class="invoice-actions">
-    <button onclick="sendPrompt('Send this invoice')">Send invoice</button>
-    <button onclick="sendPrompt('Expand to full invoice')">Expand to full invoice ↗</button>
+    <button onclick="Websandbox.connection.remote.sendPrompt({ text: 'Send this invoice' })">Send invoice</button>
+    <button onclick="Websandbox.connection.remote.sendPrompt({ text: 'Expand to full invoice' })">Expand to full invoice ↗</button>
   </div>
 </div>`;
 

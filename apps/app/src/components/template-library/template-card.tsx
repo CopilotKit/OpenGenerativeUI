@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { THEME_CSS } from "@/components/generative-ui/widget-renderer";
+import { THEME_CSS } from "@repo/design-system";
 
 const CHART_COLORS = [
   "#3b82f6", "#8b5cf6", "#ec4899", "#f59e0b",

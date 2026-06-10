@@ -1,6 +1,6 @@
 ---
 name: "Advanced Visualization Techniques"
-description: "UI mockups, dashboards, advanced interactivity, generative art, simulations, math visualizations, and design system rules for producing rich HTML widget output."
+description: "UI mockups, dashboards, advanced interactivity, generative art, simulations, math visualizations, and design system rules for producing rich generateSandboxedUi output."
 allowed-tools: []
 ---
 
@@ -9,6 +9,35 @@ allowed-tools: []
 Prerequisite: Volume 1 (SVG diagrams, basic interactive widgets, Chart.js, Mermaid).
 This volume covers: UI mockups, dashboards, advanced interactivity, generative art,
 simulations, math visualizations, and the design system that ties everything together.
+
+---
+
+## Part 0: The Tool Contract — generateSandboxedUi
+
+Everything in this volume ships through the `generateSandboxedUi` tool. The UI
+streams as you generate it, so emit the parameters in this EXACT order:
+
+1. `initialHeight` — estimated height of the finished UI in px.
+2. `placeholderMessages` — 2-4 short, playful progress messages.
+3. `css` — ALL styles, up front. The user sees a placeholder until css is complete,
+   so keep it lean and put every style here for the css-first reveal.
+4. `html` — clean body markup, streamed in live. No `<style>` blocks (the css
+   parameter owns all styles), no monolithic inline `<script>` blocks.
+5. `jsFunctions` — named function declarations: the reusable toolbox of behavior.
+6. `jsExpressions` — small statements invoking those functions, applied one-by-one
+   so the user watches each take effect.
+
+Write parameterized generators in `jsFunctions` (`drawWing(color)`, not
+`drawRedWing()`). A well-parameterized toolbox lets a later refinement turn —
+"make the wings red" — append ONE new expression to `jsExpressions` instead of
+regenerating the whole document.
+
+The sandbox iframe has NO same-origin access: no localStorage, sessionStorage,
+cookies, IndexedDB, or same-origin fetch. The host bridge is
+`await Websandbox.connection.remote.sendPrompt({ text })` and
+`await Websandbox.connection.remote.openLink({ url })` (https only). The design
+system (Part 1) and an importmap for `three`, `gsap`, `d3`, and `chart.js`
+(Part 7) are pre-injected.
 
 ---
 
@@ -104,25 +133,46 @@ Wrap in a background surface so they don't float naked:
 **Full-width mockups** (dashboards, settings pages, data tables):
 No wrapper needed — they naturally fill the viewport.
 
+**Where the styles go**: repeated patterns become classes in the css parameter;
+the html parameter stays clean markup. The metric cards below model the
+translation — the remaining patterns in this part are shown with inline style
+attributes for compactness, and you should lift them into css-parameter classes
+the same way.
+
 ### Metric Cards (for dashboards)
+
+css parameter:
+```css
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+.metric-card {
+  background: var(--color-background-secondary);
+  border-radius: var(--border-radius-md);
+  padding: 1rem;
+}
+.metric-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+.metric-value { font-size: 24px; font-weight: 500; }
+```
+
+html parameter:
 ```html
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px; margin-bottom: 1.5rem;">
-
-  <div style="background: var(--color-background-secondary);
-              border-radius: var(--border-radius-md); padding: 1rem;">
-    <div style="font-size: 13px; color: var(--color-text-secondary);
-                margin-bottom: 4px;">Total revenue</div>
-    <div style="font-size: 24px; font-weight: 500;">$142,800</div>
+<div class="metric-grid">
+  <div class="metric-card">
+    <div class="metric-label">Total revenue</div>
+    <div class="metric-value">$142,800</div>
   </div>
-
-  <div style="background: var(--color-background-secondary);
-              border-radius: var(--border-radius-md); padding: 1rem;">
-    <div style="font-size: 13px; color: var(--color-text-secondary);
-                margin-bottom: 4px;">Active users</div>
-    <div style="font-size: 24px; font-weight: 500;">8,421</div>
+  <div class="metric-card">
+    <div class="metric-label">Active users</div>
+    <div class="metric-value">8,421</div>
   </div>
-
 </div>
 ```
 
@@ -218,55 +268,61 @@ For "help me choose between X and Y":
 For teaching physics, algorithms, or systems behavior with real-time updates.
 
 **Pattern: Animation Loop with Controls**
-```html
-<style>
-  .sim-controls {
-    display: flex; align-items: center; gap: 16px;
-    margin: 12px 0; font-size: 13px;
-    color: var(--color-text-secondary);
-  }
-</style>
 
-<canvas id="sim" style="width: 100%; height: 300px;
-        border-radius: var(--border-radius-md);
-        background: var(--color-background-secondary);"></canvas>
+css parameter:
+```css
+.sim-controls {
+  display: flex; align-items: center; gap: 16px;
+  margin: 12px 0; font-size: 13px;
+  color: var(--color-text-secondary);
+}
+#sim {
+  width: 100%; height: 300px;
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-secondary);
+}
+```
+
+html parameter:
+```html
+<canvas id="sim"></canvas>
 
 <div class="sim-controls">
   <button onclick="toggleSim()">Play / Pause</button>
   <label>Speed
     <input type="range" min="1" max="10" value="5" id="speed"
-           oninput="simSpeed=+this.value">
+           oninput="setSimSpeed(+this.value)">
   </label>
   <button onclick="resetSim()">Reset</button>
 </div>
+```
 
-<script>
-const canvas = document.getElementById('sim');
-const ctx = canvas.getContext('2d');
-let running = true, simSpeed = 5, animId;
-
-function resizeCanvas() {
+jsFunctions parameter:
+```js
+function initSim(count) {
+  const canvas = document.getElementById('sim');
   canvas.width = canvas.offsetWidth;
   canvas.height = canvas.offsetHeight;
+  window.sim = {
+    canvas,
+    ctx: canvas.getContext('2d'),
+    running: true,
+    speed: 5,
+    particles: Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 2,
+      vy: (Math.random() - 0.5) * 2
+    }))
+  };
 }
-resizeCanvas();
 
-// State
-let particles = [];
-function init() {
-  particles = Array.from({length: 50}, () => ({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    vx: (Math.random() - 0.5) * 2,
-    vy: (Math.random() - 0.5) * 2
-  }));
-}
-
-function step() {
+function stepSim() {
+  const { canvas, ctx, particles, speed, running } = window.sim;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   for (const p of particles) {
-    p.x += p.vx * simSpeed * 0.2;
-    p.y += p.vy * simSpeed * 0.2;
+    p.x += p.vx * speed * 0.2;
+    p.y += p.vy * speed * 0.2;
     if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
     if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
     ctx.beginPath();
@@ -274,21 +330,46 @@ function step() {
     ctx.fillStyle = '#534AB7';
     ctx.fill();
   }
-  if (running) animId = requestAnimationFrame(step);
+  if (running) requestAnimationFrame(stepSim);
 }
 
-function toggleSim() { running = !running; if (running) step(); }
-function resetSim() { init(); if (!running) { running = true; step(); } }
+function setSimSpeed(value) { window.sim.speed = value; }
 
-init();
-step();
-</script>
+function toggleSim() {
+  window.sim.running = !window.sim.running;
+  if (window.sim.running) stepSim();
+}
+
+function resetSim() {
+  const wasRunning = window.sim.running;
+  initSim(window.sim.particles.length);
+  if (!wasRunning) stepSim();
+}
+```
+
+jsExpressions parameter:
+```js
+initSim(50);
+stepSim();
 ```
 
 ### Math Visualizations
 For plotting functions, showing geometric relationships, or exploring equations.
 
 **Pattern: Function Plotter with SVG**
+
+css parameter:
+```css
+.plot-controls {
+  display: flex; gap: 16px; align-items: center;
+  margin: 12px 0; font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.plot-controls input[type="number"] { width: 60px; }
+.plot-controls input[type="range"] { flex: 1; }
+```
+
+html parameter:
 ```html
 <svg id="plot" width="100%" viewBox="0 0 680 400">
   <!-- Grid -->
@@ -305,19 +386,20 @@ For plotting functions, showing geometric relationships, or exploring equations.
   <path id="fn-path" fill="none" stroke="#534AB7" stroke-width="2"/>
 </svg>
 
-<div style="display:flex;gap:16px;align-items:center;margin:12px 0;
-            font-size:13px;color:var(--color-text-secondary)">
+<div class="plot-controls">
   <label>f(x) = sin(
     <input type="number" id="freq" value="1" min="0.1" max="10" step="0.1"
-           style="width:60px" oninput="plotFn()">x)
+           oninput="plotFn()">x)
   </label>
   <label>Amplitude
     <input type="range" id="amp" min="0.1" max="3" value="1" step="0.1"
-           style="flex:1" oninput="plotFn()">
+           oninput="plotFn()">
   </label>
 </div>
+```
 
-<script>
+jsFunctions parameter:
+```js
 function plotFn() {
   const freq = +document.getElementById('freq').value;
   const amp = +document.getElementById('amp').value;
@@ -333,30 +415,48 @@ function plotFn() {
   }
   document.getElementById('fn-path').setAttribute('d', d);
 }
+```
+
+jsExpressions parameter:
+```js
 plotFn();
-</script>
 ```
 
 ### Sortable / Filterable Data Tables
-```html
-<style>
-  .data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  .data-table th {
-    text-align: left; padding: 8px 12px; font-weight: 500;
-    border-bottom: 0.5px solid var(--color-border-secondary);
-    color: var(--color-text-secondary); cursor: pointer;
-    user-select: none; font-size: 12px;
-  }
-  .data-table th:hover { color: var(--color-text-primary); }
-  .data-table td {
-    padding: 8px 12px;
-    border-bottom: 0.5px solid var(--color-border-tertiary);
-  }
-</style>
 
-<input type="text" placeholder="Filter..."
-       oninput="filterTable(this.value)"
-       style="width: 100%; margin-bottom: 12px;">
+css parameter:
+```css
+.data-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.data-table th {
+  text-align: left; padding: 8px 12px; font-weight: 500;
+  border-bottom: 0.5px solid var(--color-border-secondary);
+  color: var(--color-text-secondary); cursor: pointer;
+  user-select: none; font-size: 12px;
+}
+.data-table th:hover { color: var(--color-text-primary); }
+.data-table td {
+  padding: 8px 12px;
+  border-bottom: 0.5px solid var(--color-border-tertiary);
+}
+.table-filter { width: 100%; margin-bottom: 12px; }
+.status-pill {
+  font-size: 12px; padding: 2px 10px;
+  border-radius: var(--border-radius-md);
+}
+.status-pill.active {
+  background: var(--color-background-success);
+  color: var(--color-text-success);
+}
+.status-pill.paused {
+  background: var(--color-background-warning);
+  color: var(--color-text-warning);
+}
+```
+
+html parameter:
+```html
+<input type="text" class="table-filter" placeholder="Filter..."
+       oninput="filterTable(this.value)">
 
 <table class="data-table" id="table">
   <thead>
@@ -370,44 +470,51 @@ plotFn();
     <!-- Rows populated by JS -->
   </tbody>
 </table>
+```
 
-<script>
-const data = [
-  ['Alpha', 42, 'Active'],
-  ['Beta', 18, 'Paused'],
-  ['Gamma', 91, 'Active'],
-];
-let sortCol = -1, sortAsc = true;
+jsFunctions parameter:
+```js
+function initTable(rows) {
+  window.tableData = rows;
+  window.sortCol = -1;
+  window.sortAsc = true;
+  renderRows(rows);
+}
 
-function render(rows) {
+function renderRows(rows) {
   document.getElementById('tbody').innerHTML = rows.map(r =>
     `<tr><td>${r[0]}</td><td>${r[1]}</td>
-     <td><span style="font-size:12px;padding:2px 10px;
-       border-radius:var(--border-radius-md);
-       background:var(--color-background-${r[2]==='Active'?'success':'warning'});
-       color:var(--color-text-${r[2]==='Active'?'success':'warning'})">${r[2]}</span>
+     <td><span class="status-pill ${r[2] === 'Active' ? 'active' : 'paused'}">${r[2]}</span>
      </td></tr>`
   ).join('');
 }
 
 function sortTable(col) {
-  sortAsc = sortCol === col ? !sortAsc : true;
-  sortCol = col;
-  data.sort((a, b) => {
-    if (a[col] < b[col]) return sortAsc ? -1 : 1;
-    if (a[col] > b[col]) return sortAsc ? 1 : -1;
+  window.sortAsc = window.sortCol === col ? !window.sortAsc : true;
+  window.sortCol = col;
+  const asc = window.sortAsc;
+  window.tableData.sort((a, b) => {
+    if (a[col] < b[col]) return asc ? -1 : 1;
+    if (a[col] > b[col]) return asc ? 1 : -1;
     return 0;
   });
-  render(data);
+  renderRows(window.tableData);
 }
 
 function filterTable(q) {
   const low = q.toLowerCase();
-  render(data.filter(r => r.some(c => String(c).toLowerCase().includes(low))));
+  renderRows(window.tableData.filter(r =>
+    r.some(c => String(c).toLowerCase().includes(low))));
 }
+```
 
-render(data);
-</script>
+jsExpressions parameter:
+```js
+initTable([
+  ['Alpha', 42, 'Active'],
+  ['Beta', 18, 'Paused'],
+  ['Gamma', 91, 'Active'],
+]);
 ```
 
 ---
@@ -456,7 +563,8 @@ plugins: { legend: { display: false } }
 ```
 
 ### Dashboard Layout
-Metric cards on top -> chart below -> sendPrompt for drill-down:
+Metric cards on top -> chart below -> drill-down buttons wired to the
+sendPrompt bridge (Part 6):
 ```html
 <!-- Metric cards grid -->
 <div style="display: grid;
@@ -566,12 +674,19 @@ For physical scenes, use ALL hardcoded hex (no theme classes):
 ## Part 6: Advanced Patterns
 
 ### Tabbed / Multi-View Interfaces
-Since content streams top-down, don't use `display: none` during streaming.
-Instead, render all content stacked, then use post-stream JS to create tabs:
+Since html streams top-down, don't use `display: none` during streaming.
+Instead, render all content stacked, then let a jsExpression create the tabs
+once the document is complete:
 
+css parameter:
+```css
+#tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+```
+
+html parameter:
 ```html
-<div id="tabs" style="display:flex;gap:4px;margin-bottom:16px;">
-  <button onclick="showTab(0)" style="font-weight:500">Overview</button>
+<div id="tabs">
+  <button onclick="showTab(0)">Overview</button>
   <button onclick="showTab(1)">Details</button>
   <button onclick="showTab(2)">Code</button>
 </div>
@@ -579,8 +694,10 @@ Instead, render all content stacked, then use post-stream JS to create tabs:
 <div id="panel-0"><!-- Overview content --></div>
 <div id="panel-1"><!-- Details content --></div>
 <div id="panel-2"><!-- Code content --></div>
+```
 
-<script>
+jsFunctions parameter:
+```js
 function showTab(n) {
   for (let i = 0; i < 3; i++) {
     document.getElementById('panel-' + i).style.display =
@@ -592,26 +709,40 @@ function showTab(n) {
       ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)';
   });
 }
-showTab(0);
-</script>
 ```
 
-### sendPrompt() — Chat-Driven Interactivity
-A global function that sends a message as if the user typed it.
-Use it when the user's next action benefits from AI thinking:
+jsExpressions parameter:
+```js
+showTab(0);
+```
 
+### sendPrompt — Chat-Driven Interactivity
+The host bridge exposes `await Websandbox.connection.remote.sendPrompt({ text })`,
+which sends a message as if the user typed it. Use it when the user's next
+action benefits from AI thinking. Wire it through a named jsFunction:
+
+jsFunctions parameter:
+```js
+function drillDown(text) {
+  Websandbox.connection.remote.sendPrompt({ text });
+}
+```
+
+html parameter:
 ```html
-<button onclick="sendPrompt('Break down Q4 revenue by region')">
+<button onclick="drillDown('Break down Q4 revenue by region')">
   Drill into Q4 ↗
 </button>
-<button onclick="sendPrompt('Explain what shear force is')">
+<button onclick="drillDown('Explain what shear force is')">
   Learn about shear ↗
 </button>
 ```
 
 **Use for**: drill-downs, follow-up questions, "explain this part".
 **Don't use for**: filtering, sorting, toggling — handle those in JS.
-Append ` ↗` to button text when it triggers sendPrompt.
+Append ` ↗` to button text when it triggers the bridge.
+For external links use `await Websandbox.connection.remote.openLink({ url })`
+(https only — anything else is rejected).
 
 ### Responsive Grid Pattern
 ```css
@@ -653,22 +784,38 @@ Use `minmax(0, 1fr)` if children have large min-content that could overflow.
 
 ---
 
-## Part 7: External Libraries (CDN Allowlist)
+## Part 7: External Libraries
 
-Only these CDN origins work (CSP-enforced):
-- `cdnjs.cloudflare.com`
-- `esm.sh`
-- `cdn.jsdelivr.net`
-- `unpkg.com`
+### Importmap Libraries (Pre-Injected)
 
-### Useful Libraries
+An importmap for `three`, `gsap`, `d3`, and `chart.js` (served via esm.sh) is
+pre-injected into every sandbox. jsFunctions and jsExpressions execute as classic
+scripts, where top-level await is a SyntaxError that fails silently — so PREFER
+loading libraries with dynamic imports INSIDE an async function declared in
+jsFunctions, and keep jsExpressions synchronous invocations of those functions:
 
-**Chart.js** (data visualization):
-```html
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+```js
+async function setupScene() {
+  const THREE = await import('three');
+  const { OrbitControls } =
+    await import('three/examples/jsm/controls/OrbitControls.js');
+  // ... build the scene with real geometry and PBR materials.
+  // NEVER fake 3D with CSS transforms or Canvas 2D projection.
+}
 ```
 
-**Three.js** (3D graphics) — use ES module import (import map resolves bare specifiers):
+```js
+async function setupLibraries() {
+  const { default: gsap } = await import('gsap');
+  const d3 = await import('d3');
+  const { default: Chart } = await import('chart.js/auto');
+  // ... use the libraries here.
+}
+```
+
+Where a module script genuinely belongs in the html parameter,
+`<script type="module">` with bare specifiers also resolves through the importmap:
+
 ```html
 <script type="module">
 import * as THREE from 'three';
@@ -676,15 +823,22 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 // ... your Three.js code here
 </script>
 ```
-Alternative UMD (global `THREE` variable):
-```html
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-```
 
-**D3.js** (advanced data viz, force layouts, geographic maps):
-```html
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-```
+**Critical**: Regular `<script>` tags cannot use `import` statements — use
+`<script type="module">` in html. In jsFunctions/jsExpressions (classic-script
+semantics) dynamic `await import(...)` works only inside an async function body,
+never at top level.
+
+### CDN Allowlist (For Everything Else)
+
+Only these CDN origins work (CSP-enforced):
+- `cdnjs.cloudflare.com`
+- `esm.sh`
+- `cdn.jsdelivr.net`
+- `unpkg.com`
+
+`<script src>` / `<link>` CDN tags still work in the html head for libraries
+outside the importmap:
 
 **Mermaid** (ERDs, sequence diagrams, class diagrams):
 ```html
@@ -750,6 +904,9 @@ Before producing any visual, run through this:
 
 ### Functional
 - [ ] Does it work without JavaScript during streaming? (Content visible)
+- [ ] All styles live in the css parameter (no `<style>` blocks in html)
+- [ ] Behavior is split into jsFunctions (parameterized toolbox) +
+      jsExpressions (one invocation per statement)
 - [ ] Do all interactive controls have event handlers?
 - [ ] Are all displayed numbers rounded properly?
 - [ ] Does the canvas/SVG fit within the container width?
