@@ -32,7 +32,7 @@ make dev      # Start all services
 > | `claude-fable-5` | Default |
 > | `claude-opus-4-6` | Strong alternative |
 >
-> To use a different provider, swap the chat model in `apps/agent/src/model.py` (see [docs/bring-to-your-app.md](docs/bring-to-your-app.md)). Smaller or weaker models will produce broken layouts, missing interactivity, or incomplete visualizations.
+> Setting `LLM_MODEL` to a `gpt-*` name routes to OpenAI instead (requires `OPENAI_API_KEY`). For other providers, swap the chat model in `apps/agent/src/model.py` (see [docs/bring-to-your-app.md](docs/bring-to-your-app.md)). Smaller or weaker models will produce broken layouts, missing interactivity, or incomplete visualizations.
 
 - **App**: http://localhost:3000
 - **Agent**: http://localhost:8123

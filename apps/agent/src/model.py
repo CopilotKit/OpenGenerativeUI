@@ -3,6 +3,7 @@
 import os
 
 from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models.chat_models import BaseChatModel
 
 DEFAULT_MODEL = "claude-fable-5"
 
@@ -13,8 +14,16 @@ DEFAULT_MODEL = "claude-fable-5"
 MAX_TOKENS = 64000
 
 
-def build_model() -> ChatAnthropic:
+def build_model() -> BaseChatModel:
+    model_name = os.environ.get("LLM_MODEL", DEFAULT_MODEL)
+    if model_name.startswith("gpt-"):
+        # Production fallback: gpt-* names route to OpenAI so LLM_MODEL can be
+        # flipped in the deploy dashboard without a code change. No max_tokens
+        # override here — OpenAI's default matches pre-migration behavior.
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(model=model_name)
     return ChatAnthropic(
-        model=os.environ.get("LLM_MODEL", DEFAULT_MODEL),
+        model=model_name,
         max_tokens=MAX_TOKENS,
     )

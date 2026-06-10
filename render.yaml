@@ -18,6 +18,9 @@ services:
         value: "3.12.6"
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Optional fallback: set LLM_MODEL to a gpt-* name to route to OpenAI
+      - key: OPENAI_API_KEY
+        sync: false
       - key: LANGSMITH_API_KEY
         sync: false
       - key: LLM_MODEL
