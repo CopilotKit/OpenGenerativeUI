@@ -13,6 +13,7 @@ from copilotkit import CopilotKitMiddleware, LangGraphAGUIAgent
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from deepagents import create_deep_agent
 
+from src.anthropic_compat import ConsecutiveSystemMessagesMiddleware
 from src.bounded_memory_saver import BoundedMemorySaver
 from src.model import build_model
 from src.query import query_data
@@ -26,7 +27,7 @@ load_dotenv()
 agent = create_deep_agent(
     model=build_model(),
     tools=[query_data, plan_visualization, *todo_tools, generate_form],
-    middleware=[CopilotKitMiddleware()],
+    middleware=[CopilotKitMiddleware(), ConsecutiveSystemMessagesMiddleware()],
     context_schema=AgentState,
     skills=[str(Path(__file__).parent / "skills")],
     checkpointer=BoundedMemorySaver(max_threads=200),

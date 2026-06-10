@@ -102,3 +102,13 @@ def test_apply_template_appends_canonical_translation_note():
     assert "css parameter" in note
     assert "jsFunctions" in note
     assert "Websandbox.connection.remote.sendPrompt" in note
+
+
+def test_prompt_forbids_repeat_generate_sandboxed_ui_calls():
+    # followUp runs return "UI generated" to the agent; without an explicit
+    # single-build rule the model rebuilds the widget in a loop.
+    from src.prompt import SYSTEM_PROMPT
+
+    assert "at most ONCE" in SYSTEM_PROMPT
+    assert "UI generated" in SYSTEM_PROMPT
+    assert "do NOT call it again" in SYSTEM_PROMPT
