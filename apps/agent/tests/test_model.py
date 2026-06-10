@@ -23,6 +23,14 @@ def test_llm_model_env_override(monkeypatch: pytest.MonkeyPatch):
     assert model.model == "claude-opus-4-6"
 
 
+def test_max_tokens_fits_full_widget_generation():
+    # langchain-anthropic's default (4096) truncates generateSandboxedUi args
+    # mid-stream: css+html arrive but jsFunctions/jsExpressions are cut off, so
+    # htmlComplete never fires and the widget never leaves the preview sandbox.
+    model = build_model()
+    assert model.max_tokens >= 32000
+
+
 def test_main_uses_build_model():
     import ast
     from pathlib import Path
