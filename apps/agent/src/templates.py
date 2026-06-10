@@ -149,7 +149,7 @@ def list_templates(runtime: ToolRuntime):
 def apply_template(runtime: ToolRuntime, name: str = "", template_id: str = ""):
     """
     Retrieve a saved template's HTML so you can adapt it with new data.
-    After calling this, generate a NEW widget in the same style and render via widgetRenderer.
+    After calling this, generate a NEW widget in the same style and render via generateSandboxedUi.
 
     This tool automatically checks for a pending_template in state (set by the
     frontend when the user picks a template from the library). If pending_template

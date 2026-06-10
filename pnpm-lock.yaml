@@ -38,6 +38,9 @@ importers:
       '@copilotkitnext/shared':
         specifier: 1.54.1-next.6
         version: 1.54.1-next.6
+      '@jetbrains/websandbox':
+        specifier: 1.2.1
+        version: 1.2.1
       '@repo/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system

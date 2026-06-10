@@ -4,7 +4,18 @@ import "./globals.css";
 import "@copilotkit/react-core/v2/styles.css";
 
 import { CopilotKit } from "@copilotkit/react-core";
+import { OPEN_GEN_UI_DESIGN_SKILL } from "@repo/design-system";
+import { OPEN_GEN_UI_ACTIVITY_RENDERER } from "@/components/generative-ui/open-generative-ui";
+import { SANDBOX_FUNCTIONS } from "@/lib/sandbox/sandbox-functions";
+import { OpenGenUIPromptBridge } from "@/lib/sandbox/prompt-bridge";
 import { ThemeProvider } from "@/hooks/use-theme";
+
+const renderActivityMessages = [OPEN_GEN_UI_ACTIVITY_RENDERER];
+
+const openGenerativeUI = {
+  sandboxFunctions: [...SANDBOX_FUNCTIONS],
+  designSkill: OPEN_GEN_UI_DESIGN_SKILL,
+};
 
 export default function RootLayout({children}: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -22,7 +33,12 @@ export default function RootLayout({children}: Readonly<{ children: React.ReactN
       </head>
       <body className="antialiased">
         <ThemeProvider>
-          <CopilotKit runtimeUrl="/api/copilotkit">
+          <CopilotKit
+            runtimeUrl="/api/copilotkit"
+            renderActivityMessages={renderActivityMessages}
+            openGenerativeUI={openGenerativeUI}
+          >
+            <OpenGenUIPromptBridge />
             {children}
           </CopilotKit>
         </ThemeProvider>

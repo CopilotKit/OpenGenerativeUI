@@ -8,8 +8,8 @@ def plan_visualization(
     approach: str, technology: str, key_elements: list[str]
 ) -> str:
     """Plan a visualization before building it. MUST be called before
-    widgetRenderer, pieChart, or barChart. Outlines the approach, technology
-    choice, and key elements.
+    generateSandboxedUi, pieChart, or barChart. Outlines the approach,
+    technology choice, and key elements.
 
     Args:
         approach: One sentence describing the visualization strategy.
