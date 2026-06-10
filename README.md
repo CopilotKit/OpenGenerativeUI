@@ -21,19 +21,18 @@ All visuals are rendered in sandboxed iframes with automatic light/dark theming,
 
 ```bash
 make setup    # Install deps + create .env template
-# Edit apps/agent/.env with your real OpenAI API key
+# Edit apps/agent/.env with your real Anthropic API key
 make dev      # Start all services
 ```
 
-> **Strong models required.** Generative UI demands high-capability models that can produce complex, well-structured HTML/SVG in a single pass. Set `LLM_MODEL` in your `.env` to one of:
+> **Strong models required.** Generative UI demands high-capability models that can produce complex, well-structured HTML/SVG in a single pass. The agent runs on Anthropic Claude — `claude-fable-5` by default. Override with `LLM_MODEL` in your `.env`:
 >
-> | Model | Provider |
-> |-------|----------|
-> | `gpt-5.4` / `gpt-5.4-pro` | OpenAI |
-> | `claude-opus-4-6` | Anthropic |
-> | `gemini-3.1-pro` | Google |
+> | Model | Notes |
+> |-------|-------|
+> | `claude-fable-5` | Default |
+> | `claude-opus-4-6` | Strong alternative |
 >
-> Smaller or weaker models will produce broken layouts, missing interactivity, or incomplete visualizations.
+> To use a different provider, swap the chat model in `apps/agent/src/model.py` (see [docs/bring-to-your-app.md](docs/bring-to-your-app.md)). Smaller or weaker models will produce broken layouts, missing interactivity, or incomplete visualizations.
 
 - **App**: http://localhost:3000
 - **Agent**: http://localhost:8123

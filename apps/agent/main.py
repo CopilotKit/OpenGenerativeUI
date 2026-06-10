@@ -12,9 +12,9 @@ from fastapi import FastAPI
 from copilotkit import CopilotKitMiddleware, LangGraphAGUIAgent
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
 from deepagents import create_deep_agent
-from langchain_openai import ChatOpenAI
 
 from src.bounded_memory_saver import BoundedMemorySaver
+from src.model import build_model
 from src.query import query_data
 from src.todos import AgentState, todo_tools
 from src.form import generate_form
@@ -24,7 +24,7 @@ from src.prompt import SYSTEM_PROMPT
 load_dotenv()
 
 agent = create_deep_agent(
-    model=ChatOpenAI(model=os.environ.get("LLM_MODEL", "gpt-5.4-2026-03-05")),
+    model=build_model(),
     tools=[query_data, plan_visualization, *todo_tools, generate_form],
     middleware=[CopilotKitMiddleware()],
     context_schema=AgentState,

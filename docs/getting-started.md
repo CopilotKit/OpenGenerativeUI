@@ -14,17 +14,17 @@ make setup
 
 ## Configure Environment
 
-Add your OpenAI API key to `apps/agent/.env`:
+Add your Anthropic API key to `apps/agent/.env`:
 
 ```bash
-OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 You can also set these optional variables in the root `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_MODEL` | `gpt-5.4-2026-03-05` | LLM model for the agent |
+| `LLM_MODEL` | `claude-fable-5` | Claude model for the agent |
 | `RATE_LIMIT_ENABLED` | `false` | Enable per-IP rate limiting |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit window (ms) |
 | `RATE_LIMIT_MAX` | `40` | Max requests per window |

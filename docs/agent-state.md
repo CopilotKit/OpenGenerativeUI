@@ -29,7 +29,7 @@ The state schema is passed to the agent via `context_schema`:
 # apps/agent/main.py
 
 agent = create_deep_agent(
-    model=ChatOpenAI(model="gpt-5.4-2026-03-05"),
+    model=ChatAnthropic(model="claude-fable-5"),
     tools=[...],
     middleware=[CopilotKitMiddleware()],
     context_schema=AgentState,  # ← state schema

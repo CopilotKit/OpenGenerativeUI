@@ -24,8 +24,8 @@ The project includes a `render.yaml` for one-click deployment to [Render](https:
 
 | Variable | Service | Required | Notes |
 |----------|---------|----------|-------|
-| `OPENAI_API_KEY` | Agent | Yes | Your OpenAI API key |
-| `LLM_MODEL` | Agent | No | Defaults to `gpt-5.4-2026-03-05` |
+| `ANTHROPIC_API_KEY` | Agent | Yes | Your Anthropic API key |
+| `LLM_MODEL` | Agent | No | Defaults to `claude-fable-5` |
 | `LANGSMITH_API_KEY` | Agent | No | For LangSmith tracing |
 | `LANGGRAPH_DEPLOYMENT_URL` | Frontend | Auto | Injected from agent service via `fromService` |
 | `SKIP_INSTALL_DEPS` | Frontend | No | Set to `true` to skip redundant installs |
@@ -43,7 +43,7 @@ Both services are configured with:
 1. Fork the repository
 2. Create a new **Blueprint** on Render
 3. Connect your forked repo
-4. Add `OPENAI_API_KEY` as a secret
+4. Add `ANTHROPIC_API_KEY` as a secret
 5. Deploy
 
 Render reads `render.yaml` and creates both services. The frontend automatically gets the agent URL via service discovery.
@@ -63,7 +63,7 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8123
 
 Requirements:
 - Python 3.12+
-- `OPENAI_API_KEY` environment variable
+- `ANTHROPIC_API_KEY` environment variable
 - Port exposed for the frontend to reach
 
 ### 2. Frontend (Node)

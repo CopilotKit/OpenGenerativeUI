@@ -61,10 +61,10 @@ Or manually:
 
 ```bash
 pnpm install
-echo 'OPENAI_API_KEY=your-key-here' > apps/agent/.env
+echo 'ANTHROPIC_API_KEY=your-key-here' > apps/agent/.env
 ```
 
-Then add your real OpenAI API key to `apps/agent/.env`.
+Then add your real Anthropic API key to `apps/agent/.env`.
 
 ### 3) Run the Project
 

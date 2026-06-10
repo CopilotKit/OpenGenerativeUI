@@ -16,12 +16,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.6"
-      - key: OPENAI_API_KEY
+      - key: ANTHROPIC_API_KEY
         sync: false
       - key: LANGSMITH_API_KEY
         sync: false
       - key: LLM_MODEL
-        value: gpt-5.4-2026-03-05
+        value: claude-fable-5
     buildFilter:
       paths:
         - apps/agent/**
