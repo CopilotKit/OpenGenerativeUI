@@ -23,8 +23,10 @@ services:
         sync: false
       - key: LANGSMITH_API_KEY
         sync: false
+      # gpt-* names route via OpenAI, Claude names via Anthropic
+      # (see apps/agent/src/model.py)
       - key: LLM_MODEL
-        value: claude-fable-5
+        value: gpt-5.4-2026-03-05
     buildFilter:
       paths:
         - apps/agent/**
