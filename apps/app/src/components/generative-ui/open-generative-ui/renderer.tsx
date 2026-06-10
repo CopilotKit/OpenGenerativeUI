@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSandboxFunctions } from "@copilotkit/react-core/v2";
+import { ExportOverlay } from "../export-overlay";
+import { assembleStandaloneHtmlFromActivity } from "../export-utils";
 import { IDIOMORPH_JS } from "../idiomorph-inline";
 import type { OpenGenUIContent } from "./schema";
 import {
@@ -369,7 +371,21 @@ const OpenGenUIActivityRendererInner = React.memo(
     const showLoading = isGenerating && !hasVisibleSandbox;
     const loadingPhrase = useLoadingPhrase(showLoading);
 
-    return (
+    const isComplete = !isGenerating && !!content.htmlComplete;
+    const exportHtml = useMemo(
+      () =>
+        isComplete
+          ? assembleStandaloneHtmlFromActivity({
+              css: content.css,
+              html: content.html,
+              jsFunctions: content.jsFunctions,
+              jsExpressions: content.jsExpressions,
+            })
+          : undefined,
+      [isComplete, content]
+    );
+
+    const frame = (
       <div
         ref={containerRef}
         style={{
@@ -422,6 +438,18 @@ const OpenGenUIActivityRendererInner = React.memo(
           </div>
         )}
       </div>
+    );
+
+    if (!isComplete) return frame;
+
+    return (
+      <ExportOverlay
+        title="generated-widget"
+        html={exportHtml}
+        componentType="openGenUI"
+      >
+        {frame}
+      </ExportOverlay>
     );
   },
   (prev, next) => prev.content === next.content

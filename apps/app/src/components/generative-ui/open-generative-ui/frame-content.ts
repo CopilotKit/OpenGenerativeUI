@@ -74,7 +74,7 @@ export function buildPreviewBodyMorph(body: string): string {
 }
 
 /**
- * Continuous autosize, forked from the legacy widget-renderer bridge: a
+ * Continuous autosize, forked from the legacy widget renderer bridge: a
  * ResizeObserver on document.body plus a window resize listener report the
  * content height to the parent on every change. Body height is forced to auto
  * so the reading can shrink below the current iframe viewport.

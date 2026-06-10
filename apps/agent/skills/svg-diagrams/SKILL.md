@@ -10,6 +10,12 @@ You can generate rich, inline SVG diagrams to visually explain concepts. Use thi
 
 ---
 
+## Delivery
+
+Diagrams ship through the `generateSandboxedUi` tool: the SVG markup goes in the `html` parameter, where it streams to the user element by element. SVG presentation attributes (`fill`, `stroke`, `font-size`) carry all styling here — if a diagram needs CSS animation classes, declare them in the `css` parameter, never in a `<style>` block inside `html`. Static diagrams need no `jsFunctions` or `jsExpressions`.
+
+---
+
 ## When to Use
 
 - Explaining how something works (load paths, circuits, pipelines, algorithms)

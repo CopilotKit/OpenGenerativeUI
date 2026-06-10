@@ -330,7 +330,7 @@ describe("OpenGenUIActivityRenderer", () => {
   });
 
   it("updates container height on every __ogui_resize message from the sandbox iframe", async () => {
-    const { container } = renderRenderer({
+    renderRenderer({
       initialHeight: 200,
       html: ["<head></head><body><div>Done</div></body>"],
       htmlComplete: true,
@@ -339,7 +339,7 @@ describe("OpenGenUIActivityRenderer", () => {
     await flushImport();
     await resolveSandboxReady();
 
-    const div = container.firstElementChild as HTMLElement;
+    const div = mockIframe.parentElement as HTMLElement;
     expect(div.style.height).toBe("200px");
 
     await act(async () => {
@@ -435,6 +435,48 @@ describe("OpenGenUIActivityRenderer", () => {
     expect(mockCreate).toHaveBeenCalledTimes(1);
     unmount();
     expect(mockDestroy).toHaveBeenCalledTimes(1);
+  });
+
+  it("wraps the final sandbox in an export overlay once content is complete", async () => {
+    const { container } = renderRenderer({
+      css: "body{--marker:gen-css}",
+      cssComplete: true,
+      html: ['<head></head><body><div id="gen-root">Done</div></body>'],
+      htmlComplete: true,
+      generating: false,
+      jsFunctions: "function greet() { return 'hi'; }",
+      jsExpressions: ["greet();"],
+    });
+    await flushImport();
+
+    expect(container.querySelector('button[title="Options"]')).not.toBeNull();
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows no export overlay while generating", async () => {
+    const { container, rerender } = renderRenderer({
+      css: "body{--marker:gen-css}",
+      cssComplete: true,
+      html: ["<body><div>Hello</div>"],
+      htmlComplete: false,
+      generating: true,
+    });
+    await flushImport();
+
+    expect(container.querySelector('button[title="Options"]')).toBeNull();
+
+    rerender(
+      rendererElement({
+        css: "body{--marker:gen-css}",
+        cssComplete: true,
+        html: ["<head></head><body><div>Hello</div></body>"],
+        htmlComplete: true,
+        generating: false,
+      })
+    );
+    await flushImport();
+
+    expect(container.querySelector('button[title="Options"]')).not.toBeNull();
   });
 
   it("exposes a registration object ready for renderActivityMessages", () => {
