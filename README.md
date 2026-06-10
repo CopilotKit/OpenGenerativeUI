@@ -127,15 +127,17 @@ Deep agents also provide built-in planning (`write_todos`), filesystem tools, an
 
 1. **User sends a prompt** via the CopilotKit chat UI
 2. **Deep agent decides** whether to respond with text, call a tool, or render a visual component — consulting relevant skills as needed
-3. **`widgetRenderer`** — a frontend `useComponent` hook — receives the agent's HTML and renders it in a sandboxed iframe
-4. **Skeleton loading** shows while the iframe loads, then content fades in smoothly
-5. **ResizeObserver** inside the iframe reports content height back to the parent for seamless auto-sizing
+3. **`generateSandboxedUi`** — the canonical tool the CopilotKit runtime exposes when `openGenerativeUI` is enabled — receives the UI as ordered streaming parameters: `initialHeight` → `placeholderMessages` → `css` → `html` → `jsFunctions` → `jsExpressions`
+4. **`OpenGenerativeUIMiddleware`** in the runtime translates the streaming tool call into `open-generative-ui` activity events the frontend subscribes to
+5. **The demo's activity renderer** (registered via `renderActivityMessages`) shows the html streaming in live — morphing each update into a preview iframe with Idiomorph so nothing flickers — then boots the final websandbox iframe with the shared design-system CSS and CDN importmap injected
+6. **Sandbox bridge + autosize** — the generated UI calls back into the host through Zod-validated `sendPrompt`/`openLink` sandbox functions, and a ResizeObserver inside the iframe continuously reports content height for seamless auto-sizing
 
 ### Key CopilotKit Patterns
 
-| Pattern | Hook | Example |
-|---------|------|---------|
-| Generative UI | `useComponent` | Pie charts, bar charts, widget renderer |
+| Pattern | Hook / Option | Example |
+|---------|---------------|---------|
+| Open Generative UI | `openGenerativeUI` + `renderActivityMessages` | Streaming sandboxed widgets via `generateSandboxedUi` |
+| Generative UI | `useComponent` | Pie charts, bar charts |
 | Frontend tools | `useFrontendTool` | Theme toggle |
 | Human-in-the-loop | `useHumanInTheLoop` | Meeting scheduler |
 | Default tool render | `useDefaultRenderTool` | Tool execution status |

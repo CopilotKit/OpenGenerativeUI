@@ -82,6 +82,19 @@ def _load_seed_html() -> None:
 _load_seed_html()
 
 
+# Appended to every apply_template payload: template HTML is a style
+# reference saved as a single string, so it may bundle idioms that the
+# canonical generateSandboxedUi contract splits across parameters.
+TEMPLATE_USAGE_NOTE = (
+    "This template HTML is a style reference only. When regenerating via "
+    "generateSandboxedUi: move any <style> block content into the css parameter "
+    "(the html parameter must not contain <style> blocks); put behavior in "
+    "jsFunctions/jsExpressions; and send prompts through the sandbox bridge — "
+    "await Websandbox.connection.remote.sendPrompt({ text }) — never a bare "
+    "sendPrompt(...) call."
+)
+
+
 @tool
 def save_template(
     name: str,
@@ -180,6 +193,7 @@ def apply_template(runtime: ToolRuntime, name: str = "", template_id: str = ""):
                     "description": t["description"],
                     "html": t["html"],
                     "data_description": t.get("data_description", ""),
+                    "usage_note": TEMPLATE_USAGE_NOTE,
                 }
         return {"error": f"Template with id '{template_id}' not found"}
 
@@ -193,6 +207,7 @@ def apply_template(runtime: ToolRuntime, name: str = "", template_id: str = ""):
                 "description": t["description"],
                 "html": t["html"],
                 "data_description": t.get("data_description", ""),
+                "usage_note": TEMPLATE_USAGE_NOTE,
             }
         return {"error": f"No template named '{name}' found"}
 

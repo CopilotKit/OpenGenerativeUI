@@ -2,7 +2,7 @@
 
 Generative UI lets the agent render React components directly in the chat. Instead of responding with text, the agent can produce charts, interactive widgets, visualizations, and custom UI.
 
-All generative UI in this project is registered in `apps/app/src/hooks/use-generative-ui-examples.tsx`.
+Hook-based generative UI in this project is registered in `apps/app/src/hooks/use-generative-ui-examples.tsx`. Free-form sandboxed widgets use the runtime-level **Open Generative UI** rail (see below), wired up in `apps/app/src/app/layout.tsx`.
 
 ## Hooks Overview
 
@@ -14,7 +14,7 @@ All generative UI in this project is registered in `apps/app/src/hooks/use-gener
 | `useDefaultRenderTool` | Fallback renderer for any tool without a custom renderer |
 | `useHumanInTheLoop` | Interactive component that pauses the agent for user input |
 
-All hooks are imported from `@copilotkit/react-core/v2`.
+All hooks are imported from `@copilotkit/react-core/v2`. Sandboxed streaming widgets are not hook-registered — they ride the runtime's `openGenerativeUI` option and the provider's `renderActivityMessages` prop.
 
 ## useComponent — Agent-Rendered Components
 
@@ -43,25 +43,37 @@ useComponent({
 });
 ```
 
-### Widget Renderer (Sandboxed HTML)
+## Open Generative UI — Sandboxed Streaming Widgets
 
-The `widgetRenderer` component renders arbitrary HTML/SVG in a sandboxed iframe. This is the most flexible generative UI — the agent writes HTML and it gets rendered with full interactivity.
+Free-form HTML/SVG widgets use CopilotKit's canonical **Open Generative UI** rail instead of a custom component. The agent streams a whole UI — styles, markup, and behavior — and the frontend renders it live in a sandboxed iframe.
+
+How the pieces connect:
+
+1. **Runtime** — the CopilotKit API route enables the rail with `openGenerativeUI: true` (`apps/app/src/lib/copilotkit-runtime-options.ts`). This injects the `generateSandboxedUi` tool for the agent.
+2. **Tool** — the agent calls `generateSandboxedUi` with parameters streamed in a fixed order: `initialHeight` → `placeholderMessages` → `css` → `html` → `jsFunctions` → `jsExpressions`. CSS arrives first so the UI never renders unstyled; expressions arrive last so the user watches each behavior take effect.
+3. **Middleware** — the runtime's `OpenGenerativeUIMiddleware` turns the streaming tool call into `open-generative-ui` activity events.
+4. **Renderer** — the demo registers a custom activity renderer (`apps/app/src/components/generative-ui/open-generative-ui/`) via the provider's `renderActivityMessages` prop. While html streams it morphs each update into a preview iframe with Idiomorph (no flicker); once html completes it boots a [websandbox](https://github.com/jetbrains/websandbox) iframe with the shared design-system CSS and CDN importmap injected, runs `jsFunctions` then each `jsExpression`, and continuously autosizes from a ResizeObserver inside the frame.
+5. **Sandbox bridge** — generated UI calls back into the host through Zod-validated sandbox functions (`apps/app/src/lib/sandbox/sandbox-functions.ts`): `await Websandbox.connection.remote.sendPrompt({ text })` and `await Websandbox.connection.remote.openLink({ url })`.
 
 ```tsx
-useComponent({
-  name: "widgetRenderer",
-  description:
-    "Renders interactive HTML/SVG visualizations in a sandboxed iframe. " +
-    "Use for algorithm visualizations, diagrams, interactive widgets, " +
-    "simulations, math plots, and any visual explanation.",
-  parameters: WidgetRendererProps, // { title, description, html }
-  render: WidgetRenderer,
-});
+// app/layout.tsx
+const renderActivityMessages = [OPEN_GEN_UI_ACTIVITY_RENDERER];
+
+const openGenerativeUI = {
+  sandboxFunctions: [...SANDBOX_FUNCTIONS], // sendPrompt, openLink
+  designSkill: OPEN_GEN_UI_DESIGN_SKILL,    // teaches the agent the design system
+};
+
+<CopilotKit
+  runtimeUrl="/api/copilotkit"
+  renderActivityMessages={renderActivityMessages}
+  openGenerativeUI={openGenerativeUI}
+>
 ```
 
 The iframe environment includes:
 
-**ES Module Libraries** (use `<script type="module">` with bare imports):
+**ES Module Libraries** (importmap pre-injected; use `<script type="module">` with bare imports in html, or `await import(...)` inside an async function in `jsFunctions` — the js channels run as classic scripts, so top-level `await` is not allowed):
 - `three` — 3D graphics (`import * as THREE from "three"`)
 - `gsap` — Animation (`import gsap from "gsap"`)
 - `d3` — Data visualization (`import * as d3 from "d3"`)

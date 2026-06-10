@@ -789,8 +789,10 @@ Use `minmax(0, 1fr)` if children have large min-content that could overflow.
 ### Importmap Libraries (Pre-Injected)
 
 An importmap for `three`, `gsap`, `d3`, and `chart.js` (served via esm.sh) is
-pre-injected into every sandbox. PREFER loading them with dynamic imports inside
-jsFunctions/jsExpressions:
+pre-injected into every sandbox. jsFunctions and jsExpressions execute as classic
+scripts, where top-level await is a SyntaxError that fails silently — so PREFER
+loading libraries with dynamic imports INSIDE an async function declared in
+jsFunctions, and keep jsExpressions synchronous invocations of those functions:
 
 ```js
 async function setupScene() {
@@ -803,9 +805,12 @@ async function setupScene() {
 ```
 
 ```js
-const { default: gsap } = await import('gsap');
-const d3 = await import('d3');
-const { default: Chart } = await import('chart.js/auto');
+async function setupLibraries() {
+  const { default: gsap } = await import('gsap');
+  const d3 = await import('d3');
+  const { default: Chart } = await import('chart.js/auto');
+  // ... use the libraries here.
+}
 ```
 
 Where a module script genuinely belongs in the html parameter,
@@ -820,8 +825,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 ```
 
 **Critical**: Regular `<script>` tags cannot use `import` statements — use
-`<script type="module">` in html, or dynamic `await import(...)` in
-jsFunctions/jsExpressions.
+`<script type="module">` in html. In jsFunctions/jsExpressions (classic-script
+semantics) dynamic `await import(...)` works only inside an async function body,
+never at top level.
 
 ### CDN Allowlist (For Everything Else)
 

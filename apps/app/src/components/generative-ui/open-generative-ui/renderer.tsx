@@ -17,9 +17,19 @@ import {
 import { extractCompleteStyles, processPartialHtml } from "./process-partial-html";
 import { loadWebsandbox, type SandboxInstance } from "./websandbox-loader";
 
-const THROTTLE_MS = 1000;
+export const THROTTLE_MS = 1000;
 const MIN_HEIGHT = 50;
 const MAX_HEIGHT = 4000;
+
+/**
+ * Clamp a sandbox-reported height to the allowed range. Returns null for
+ * anything that is not a finite number (NaN/Infinity pass a bare typeof
+ * check and would otherwise poison the container height).
+ */
+export function clampReportedHeight(height: unknown): number | null {
+  if (typeof height !== "number" || !Number.isFinite(height)) return null;
+  return Math.max(MIN_HEIGHT, Math.min(Math.ceil(height), MAX_HEIGHT));
+}
 
 export const LOADING_PHRASES = [
   "Sketching pixels",
@@ -258,12 +268,10 @@ const OpenGenUIActivityRendererInner = React.memo(
         if (!sandbox) return;
         if (
           e.source === sandbox.iframe.contentWindow &&
-          e.data?.type === RESIZE_MESSAGE_TYPE &&
-          typeof e.data.height === "number"
+          e.data?.type === RESIZE_MESSAGE_TYPE
         ) {
-          setAutoHeight(
-            Math.max(MIN_HEIGHT, Math.min(Math.ceil(e.data.height), MAX_HEIGHT))
-          );
+          const clamped = clampReportedHeight(e.data.height);
+          if (clamped !== null) setAutoHeight(clamped);
         }
       };
       window.addEventListener("message", onMessage);
@@ -440,13 +448,16 @@ const OpenGenUIActivityRendererInner = React.memo(
       </div>
     );
 
-    if (!isComplete) return frame;
-
+    // Always wrap in ExportOverlay so the rendered tree shape never changes:
+    // switching the root from the bare frame div to a wrapper when isComplete
+    // flips would remount the container and silently destroy the live
+    // websandbox iframe created during the htmlComplete && generating window.
     return (
       <ExportOverlay
         title="generated-widget"
         html={exportHtml}
         componentType="openGenUI"
+        ready={isComplete}
       >
         {frame}
       </ExportOverlay>

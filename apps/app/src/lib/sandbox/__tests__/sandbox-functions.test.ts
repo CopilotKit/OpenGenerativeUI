@@ -168,12 +168,12 @@ describe("isAllowedLinkUrl", () => {
 });
 
 describe("SANDBOX_FUNCTIONS", () => {
-  it("contains sendPrompt and openLink with a stable reference", async () => {
+  it("contains sendPrompt and openLink", () => {
+    // (No re-import identity assertion here: ES module caching makes it
+    // tautological — referential stability is guaranteed by the const export.)
     expect(SANDBOX_FUNCTIONS.map((f) => f.name)).toEqual([
       "sendPrompt",
       "openLink",
     ]);
-    const again = await import("@/lib/sandbox/sandbox-functions");
-    expect(again.SANDBOX_FUNCTIONS).toBe(SANDBOX_FUNCTIONS);
   });
 });

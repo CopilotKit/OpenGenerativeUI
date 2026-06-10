@@ -9,8 +9,11 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
-    "lint": {},
+    "lint": {
+      "dependsOn": ["^build"]
+    },
     "test": {
+      "dependsOn": ["^build"],
       "cache": false
     },
     "clean": {

@@ -9,7 +9,6 @@ import { GridIcon } from "@/components/demo-gallery/grid-icon";
 import { DesktopTipModal } from "@/components/desktop-tip-modal";
 import { QrButton, QrModal } from "@/components/qr-modal";
 import { CopilotChat, useAgent, useCopilotKit } from "@copilotkit/react-core/v2";
-import { isAllowedLinkUrl } from "@/lib/sandbox/sandbox-functions";
 
 export default function HomePage() {
   useGenerativeUIExamples();
@@ -76,21 +75,10 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, [qrOpen, qrSessionId, sendPrompt]);
 
-  // Widget bridge: handle messages from widget iframes
-  useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (
-        e.data?.type === "open-link" &&
-        typeof e.data.url === "string" &&
-        isAllowedLinkUrl(e.data.url)
-      ) {
-        window.open(e.data.url, "_blank", "noopener,noreferrer");
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, []);
-
+  // Note: sandbox openLink requests are handled by the Zod-validated
+  // Websandbox localApi (src/lib/sandbox/sandbox-functions.ts). The legacy
+  // 'open-link' postMessage listener was removed with the retired legacy
+  // rail: it had no source/origin check and nothing in the app posts it.
 
   return (
     <>

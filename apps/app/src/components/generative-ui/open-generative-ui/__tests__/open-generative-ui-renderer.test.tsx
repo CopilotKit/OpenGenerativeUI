@@ -13,6 +13,7 @@ import {
   LOADING_PHRASES,
   type OpenGenUIContent,
 } from "../index";
+import { THROTTLE_MS } from "../renderer";
 
 // The react-core v2 dist entry imports index.css, which vitest's node loader
 // rejects (same precedent as src/lib/sandbox/__tests__/prompt-bridge.test.tsx)
@@ -120,7 +121,9 @@ describe("OpenGenUIActivityRenderer", () => {
     const { container } = renderRenderer({ initialHeight: 300, generating: true });
     await flushImport();
 
-    const div = container.firstElementChild as HTMLElement;
+    // The root is the constant ExportOverlay wrapper; the frame div with the
+    // height style is its child.
+    const div = container.querySelector<HTMLElement>("div[style]")!;
     expect(div.style.height).toBe("300px");
     expect(container.textContent).toContain(LOADING_PHRASES[0]);
     expect(mockCreate).not.toHaveBeenCalled();
@@ -144,7 +147,7 @@ describe("OpenGenUIActivityRenderer", () => {
       })
     );
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 1100));
+      await new Promise((r) => setTimeout(r, THROTTLE_MS + 100));
     });
     await flushImport();
 
@@ -197,8 +200,14 @@ describe("OpenGenUIActivityRenderer", () => {
     const morphCode = morphCalls[morphCalls.length - 1]![0] as string;
     expect(morphCode).toContain("Idiomorph.morph(document.body");
     expect(morphCode).toContain("morphStyle: 'innerHTML'");
+    // Streaming entrance animation: new nodes are tagged morph-enter so the
+    // design system's fadeSlideIn rule animates them in (legacy bridge parity).
+    expect(morphCode).toContain("beforeNodeAdded");
+    expect(morphCode).toContain("morph-enter");
     expect(morphCode).toContain("document.body.innerHTML");
     expect(morphCode).toContain("Hello");
+    // processPartialHtml must have stripped the <body> wrapper before morph.
+    expect(morphCode).not.toContain("<body>");
 
     rerender(
       rendererElement({
@@ -210,7 +219,7 @@ describe("OpenGenUIActivityRenderer", () => {
       })
     );
     await act(async () => {
-      await new Promise((r) => setTimeout(r, 1100));
+      await new Promise((r) => setTimeout(r, THROTTLE_MS + 100));
     });
     await flushImport();
 
@@ -256,6 +265,41 @@ describe("OpenGenUIActivityRenderer", () => {
     expect(designSystemIdx).toBeGreaterThan(importmapIdx);
     expect(generatedCssIdx).toBeGreaterThan(designSystemIdx);
     expect(generatedHtmlIdx).toBeGreaterThan(generatedCssIdx);
+  });
+
+  it("injects a CSP meta limiting script/connect origins to the four-CDN allowlist", async () => {
+    renderRenderer({
+      html: ['<head></head><body><div id="gen-root">Done</div></body>'],
+      htmlComplete: true,
+      generating: false,
+    });
+    await flushImport();
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    const [, options] = mockCreate.mock.calls[0]!;
+    const frameContent = options.frameContent as string;
+
+    const cspMatch = frameContent.match(
+      /<meta http-equiv="Content-Security-Policy" content="([\s\S]*?)">/
+    );
+    expect(cspMatch).not.toBeNull();
+    const csp = cspMatch![1]!;
+    expect(csp).toContain("default-src 'self'");
+    const scriptSrc = csp.match(/script-src[\s\S]*?;/)![0];
+    const connectSrc = csp.match(/connect-src[\s\S]*?;/)![0];
+    for (const origin of [
+      "https://cdnjs.cloudflare.com",
+      "https://esm.sh",
+      "https://cdn.jsdelivr.net",
+      "https://unpkg.com",
+    ]) {
+      expect(scriptSrc).toContain(origin);
+      expect(connectSrc).toContain(origin);
+    }
+    // CSP precedes any generated content.
+    expect(frameContent.indexOf("Content-Security-Policy")).toBeLessThan(
+      frameContent.indexOf('<div id="gen-root">')
+    );
   });
 
   it("ensures a <head> exists and still injects head content first when html has none", async () => {
@@ -361,6 +405,76 @@ describe("OpenGenUIActivityRenderer", () => {
       );
     });
     expect(div.style.height).toBe("333px");
+  });
+
+  it("ignores __ogui_resize messages from foreign sources", async () => {
+    renderRenderer({
+      initialHeight: 200,
+      html: ["<head></head><body><div>Done</div></body>"],
+      htmlComplete: true,
+      generating: false,
+    });
+    await flushImport();
+    await resolveSandboxReady();
+
+    const div = mockIframe.parentElement as HTMLElement;
+    expect(div.style.height).toBe("200px");
+
+    await act(async () => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          data: { type: "__ogui_resize", height: 999 },
+          source: window, // not the sandbox iframe's contentWindow
+        })
+      );
+    });
+    expect(div.style.height).toBe("200px");
+  });
+
+  it("clamps reported heights to the 50..4000 range and rejects non-finite values", async () => {
+    renderRenderer({
+      initialHeight: 200,
+      html: ["<head></head><body><div>Done</div></body>"],
+      htmlComplete: true,
+      generating: false,
+    });
+    await flushImport();
+    await resolveSandboxReady();
+
+    const div = mockIframe.parentElement as HTMLElement;
+    const send = async (height: unknown) => {
+      await act(async () => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: { type: "__ogui_resize", height },
+            source: mockIframe.contentWindow,
+          })
+        );
+      });
+    };
+
+    await send(1);
+    expect(div.style.height).toBe("50px");
+    await send(999999);
+    expect(div.style.height).toBe("4000px");
+    // Non-finite numbers pass a bare typeof check — they must be rejected.
+    await send(NaN);
+    expect(div.style.height).toBe("4000px");
+    await send(Infinity);
+    expect(div.style.height).toBe("4000px");
+  });
+
+  it("clampReportedHeight rejects non-numbers and non-finite numbers", async () => {
+    const { clampReportedHeight } = await import("../renderer");
+    expect(clampReportedHeight(420)).toBe(420);
+    expect(clampReportedHeight(420.4)).toBe(421);
+    expect(clampReportedHeight(1)).toBe(50);
+    expect(clampReportedHeight(999999)).toBe(4000);
+    expect(clampReportedHeight(NaN)).toBeNull();
+    expect(clampReportedHeight(Infinity)).toBeNull();
+    expect(clampReportedHeight(-Infinity)).toBeNull();
+    expect(clampReportedHeight("300")).toBeNull();
+    expect(clampReportedHeight(undefined)).toBeNull();
   });
 
   it("installs a continuous ResizeObserver measurement script in the final sandbox", async () => {
@@ -476,6 +590,45 @@ describe("OpenGenUIActivityRenderer", () => {
     );
     await flushImport();
 
+    expect(container.querySelector('button[title="Options"]')).not.toBeNull();
+  });
+
+  it("keeps the live final sandbox iframe attached when generating flips to false after htmlComplete", async () => {
+    // Realistic streaming sequence: the middleware emits htmlComplete:true as
+    // soon as the html argument finishes parsing, and generating:false only
+    // later at TOOL_CALL_END — the final sandbox is created during the
+    // intermediate snapshot.
+    const { container, rerender } = renderRenderer({
+      css: "body{--marker:gen-css}",
+      cssComplete: true,
+      html: ['<head></head><body><div id="gen-root">Done</div></body>'],
+      htmlComplete: true,
+      generating: true,
+    });
+    await flushImport();
+    await resolveSandboxReady();
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    const iframe = mockIframe;
+    expect(iframe.isConnected).toBe(true);
+
+    rerender(
+      rendererElement({
+        css: "body{--marker:gen-css}",
+        cssComplete: true,
+        html: ['<head></head><body><div id="gen-root">Done</div></body>'],
+        htmlComplete: true,
+        generating: false,
+      })
+    );
+    await flushImport();
+
+    // The tree shape must stay constant: no remount, no extra sandbox, the
+    // same iframe still in the document.
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockDestroy).not.toHaveBeenCalled();
+    expect(iframe.isConnected).toBe(true);
+    // And the export overlay trigger appears once complete.
     expect(container.querySelector('button[title="Options"]')).not.toBeNull();
   });
 

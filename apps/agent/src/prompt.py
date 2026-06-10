@@ -41,7 +41,11 @@ The generated UI runs inside a sandboxed iframe WITHOUT same-origin access:
   - Pre-built SVG CSS classes for color ramps (.c-purple, .c-teal, .c-blue, etc.)
 - An importmap is pre-injected for `three`, `gsap`, `d3`, and `chart.js` (served via
   esm.sh). In the html parameter you may use `<script type="module">` with bare import
-  specifiers; in jsFunctions/jsExpressions use dynamic imports, e.g. `await import('three')`.
+  specifiers. jsFunctions/jsExpressions execute as classic scripts, where top-level
+  `await` is a SyntaxError — use dynamic imports ONLY inside an async function in
+  jsFunctions, e.g. `async function setup() { const THREE = await import('three'); }`,
+  and keep each jsExpression a synchronous statement that invokes those functions,
+  e.g. `setup();`.
 
 ## Visualization Workflow (MANDATORY)
 
@@ -62,16 +66,18 @@ barChart without calling plan_visualization first.
 
 ## Visualization Quality Standards
 
-Library access inside the sandbox:
-- `three` — 3D graphics. In jsFunctions: `const THREE = await import('three')`. Camera
+Library access inside the sandbox (each `await import(...)` belongs inside an async
+function declared in jsFunctions — never at the top level of jsFunctions or in a
+jsExpression):
+- `three` — 3D graphics: `const THREE = await import('three')`. Camera
   controls via `await import('three/examples/jsm/controls/OrbitControls.js')`.
-- `gsap` — animation. `const { default: gsap } = await import('gsap')`.
-- `d3` — data visualization and force layouts. `const d3 = await import('d3')`.
+- `gsap` — animation: `const { default: gsap } = await import('gsap')`.
+- `d3` — data visualization and force layouts: `const d3 = await import('d3')`.
 - `chart.js/auto` — charts (but prefer the built-in `barChart`/`pieChart` components for simple charts).
 
 **3D content**: ALWAYS use Three.js with proper WebGL rendering. Use real geometry, PBR materials (MeshStandardMaterial/MeshPhysicalMaterial), multiple light sources, and OrbitControls for interactivity. NEVER fake 3D with CSS transforms, CSS perspective, or Canvas 2D manual projection — these look broken and unprofessional.
 
 **Quality bar**: Every visualization should look polished and portfolio-ready. Use smooth animations, proper lighting (ambient + directional at minimum), responsive canvas sizing (`window.addEventListener('resize', ...)`), and antialiasing (`antialias: true`). No proof-of-concept quality.
 
-**Critical**: Regular `<script>` tags cannot use `import` statements — use `<script type="module">` in html, or dynamic `await import(...)` in jsFunctions/jsExpressions.
+**Critical**: Regular `<script>` tags cannot use `import` statements — use `<script type="module">` in html. jsFunctions/jsExpressions run as classic scripts: dynamic `await import(...)` works there only inside an async function body, never at top level.
 """

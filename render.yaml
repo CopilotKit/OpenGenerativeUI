@@ -36,7 +36,8 @@ services:
       maxInstances: 3
       targetMemoryPercent: 80
       targetCPUPercent: 70
-    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm --filter @repo/app build
+    # turbo's build task dependsOn ^build, so @repo/design-system dist/ is built before the app
+    buildCommand: corepack enable && pnpm install --no-frozen-lockfile && pnpm exec turbo run build --filter=@repo/app
     startCommand: pnpm --filter @repo/app start
     healthCheckPath: /api/health
     envVars:
@@ -60,6 +61,7 @@ services:
     buildFilter:
       paths:
         - apps/app/**
+        - packages/design-system/**
         - package.json
         - pnpm-lock.yaml
         - turbo.json

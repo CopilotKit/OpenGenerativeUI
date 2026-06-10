@@ -30,17 +30,39 @@ describe("assembleStandaloneHtmlFromActivity", () => {
     expect(doc.indexOf("<div>Hello</div>")).toBeGreaterThan(doc.indexOf("</head>"));
   });
 
-  it("emits jsFunctions before jsExpressions in order inside a module script", () => {
+  it("emits jsFunctions at top level of a classic script so declarations become globals", () => {
     const doc = assembleStandaloneHtmlFromActivity(content, "My Widget");
-    const moduleIdx = doc.indexOf('<script type="module">');
+    // Classic script — never a module: module scope would hide function
+    // declarations from inline onclick="..." handlers, which the live
+    // websandbox rail evaluates in global scope.
+    expect(doc).not.toContain('<script type="module">');
+    const iifeIdx = doc.indexOf("(async () => {");
     const fnIdx = doc.indexOf("function greet()");
+    expect(iifeIdx).toBeGreaterThanOrEqual(0);
+    expect(fnIdx).toBeGreaterThanOrEqual(0);
+    // jsFunctions live at top level, BEFORE (outside) the async IIFE.
+    expect(fnIdx).toBeLessThan(iifeIdx);
+  });
+
+  it("emits jsExpressions in order inside the await-friendly async IIFE", () => {
+    const doc = assembleStandaloneHtmlFromActivity(content, "My Widget");
+    const iifeIdx = doc.indexOf("(async () => {");
+    const iifeEndIdx = doc.indexOf("})();");
     const expr1Idx = doc.indexOf("greet();");
     const expr2Idx = doc.indexOf("console.log('done');");
-    expect(moduleIdx).toBeGreaterThanOrEqual(0);
-    expect(fnIdx).toBeGreaterThan(moduleIdx);
-    expect(expr1Idx).toBeGreaterThan(fnIdx);
+    expect(iifeIdx).toBeGreaterThanOrEqual(0);
+    expect(expr1Idx).toBeGreaterThan(iifeIdx);
     expect(expr2Idx).toBeGreaterThan(expr1Idx);
-    expect(doc).toContain("(async () => {");
+    expect(iifeEndIdx).toBeGreaterThan(expr2Idx);
+  });
+
+  it("omits the async IIFE when there are no jsExpressions", () => {
+    const doc = assembleStandaloneHtmlFromActivity(
+      { html: ["<div></div>"], jsFunctions: "function f() {}" },
+      "Fns only"
+    );
+    expect(doc).toContain("function f() {}");
+    expect(doc).not.toContain("(async () => {");
   });
 
   it("includes a Websandbox stub so bridge calls degrade gracefully", () => {
@@ -64,6 +86,18 @@ describe("assembleStandaloneHtmlFromActivity", () => {
     expect(doc).toContain('const s = "<\\/script>";');
     expect(doc).not.toContain('document.title = "</script>";');
     expect(doc).toContain('document.title = "<\\/script>";');
+  });
+
+  it("neutralizes closing style sequences embedded in generated css", () => {
+    const doc = assembleStandaloneHtmlFromActivity(
+      {
+        css: "body{color:red}</style><script>alert(1)</script>",
+        html: ["<div></div>"],
+      },
+      "Css escape"
+    );
+    expect(doc).not.toContain("</style><script>alert(1)</script>");
+    expect(doc).toContain("body{color:red}<\\/style>");
   });
 
   it("tolerates empty and missing fields", () => {

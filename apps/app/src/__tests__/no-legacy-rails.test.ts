@@ -2,7 +2,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, it, expect } from "vitest";
 
-const CAMEL_NEEDLE = ["widget", "Renderer"].join("");
+// Matched case-insensitively (file contents are lowercased first), so the
+// camel needle also catches PascalCase WidgetRenderer / WidgetRendererProps.
+const CAMEL_NEEDLE = ["widget", "renderer"].join("");
 const KEBAB_NEEDLE = ["widget", "-", "renderer"].join("");
 const SRC_ROOT = resolve(__dirname, "..");
 const SELF = resolve(__dirname, "no-legacy-rails.test.ts");
@@ -26,7 +28,7 @@ describe("no legacy widget rails", () => {
     const offenders = collectFiles(SRC_ROOT)
       .filter((file) => resolve(file) !== SELF)
       .filter((file) => {
-        const source = readFileSync(file, "utf8");
+        const source = readFileSync(file, "utf8").toLowerCase();
         return source.includes(CAMEL_NEEDLE) || source.includes(KEBAB_NEEDLE);
       });
     expect(offenders).toEqual([]);

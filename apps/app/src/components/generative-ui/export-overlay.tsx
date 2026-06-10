@@ -78,7 +78,8 @@ export function ExportOverlay({
     );
   }, [exportHtml]);
 
-  const showTrigger = ready && exportHtml && (hovered || menuOpen);
+  const exportable = ready && !!exportHtml;
+  const showTrigger = exportable && (hovered || menuOpen);
 
   return (
     <div
@@ -86,6 +87,7 @@ export function ExportOverlay({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      {exportable && (
       <div
         className="absolute top-2 right-2 z-10 transition-opacity duration-200"
         style={{
@@ -157,6 +159,7 @@ export function ExportOverlay({
           )}
         </div>
       </div>
+      )}
 
       {children}
     </div>

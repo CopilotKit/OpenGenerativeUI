@@ -28,28 +28,42 @@ function escapeScriptClose(js: string): string {
   return js.replace(/<\/script/gi, "<\\/script");
 }
 
+function escapeStyleClose(css: string): string {
+  return css.replace(/<\/style/gi, "<\\/style");
+}
+
 /**
  * Wrap an open-generative-ui activity payload in a standalone document that
  * works when opened in a browser: importmap first, then the same design-system
  * css composition the live renderer injects, then the generated css, a
  * Websandbox stub so exported bridge calls degrade gracefully, the joined html
- * chunks, and finally the generated js inside an await-friendly module script.
+ * chunks, and finally the generated js in ONE classic (non-module) script:
+ * jsFunctions at top level — so function declarations become window globals,
+ * matching the live websandbox rail where inline onclick="fn()" handlers
+ * resolve them — followed by the jsExpressions inside an async IIFE so they
+ * can use `await` (dynamic import() still resolves via the importmap in
+ * classic scripts).
  */
 export function assembleStandaloneHtmlFromActivity(
   content: StandaloneActivityContent,
   title = "generated-widget"
 ): string {
   const body = content.html?.join("") ?? "";
-  const jsParts = [
-    ...(content.jsFunctions ? [content.jsFunctions] : []),
-    ...(content.jsExpressions ?? []),
+  const expressions = content.jsExpressions ?? [];
+  const scriptParts = [
+    ...(content.jsFunctions ? [escapeScriptClose(content.jsFunctions)] : []),
+    ...(expressions.length > 0
+      ? [
+          `(async () => {
+${expressions.map(escapeScriptClose).join("\n")}
+})();`,
+        ]
+      : []),
   ];
-  const moduleScript =
-    jsParts.length > 0
-      ? `<script type="module">
-(async () => {
-${jsParts.map(escapeScriptClose).join("\n")}
-})();
+  const generatedScript =
+    scriptParts.length > 0
+      ? `<script>
+${scriptParts.join("\n")}
   </script>`
       : "";
   return `<!DOCTYPE html>
@@ -63,12 +77,12 @@ ${jsParts.map(escapeScriptClose).join("\n")}
     ${THEME_CSS}
     ${SVG_CLASSES_CSS}
     ${FORM_STYLES_CSS}
-  </style>${content.css ? `\n  <style>${content.css}</style>` : ""}
+  </style>${content.css ? `\n  <style>${escapeStyleClose(content.css)}</style>` : ""}
   <script>${WEBSANDBOX_STUB}</script>
 </head>
 <body>
   ${body}
-  ${moduleScript}
+  ${generatedScript}
 </body>
 </html>`;
 }

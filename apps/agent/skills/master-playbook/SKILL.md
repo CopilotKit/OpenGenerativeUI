@@ -93,8 +93,11 @@ The UI runs in a sandboxed iframe WITHOUT same-origin access:
 - The design system is pre-injected: CSS variables, pre-styled form elements, and
   `.c-*` SVG color-ramp classes. The css parameter holds widget-specific styles only.
 - An importmap is pre-injected for `three`, `gsap`, `d3`, and `chart.js` (served via
-  esm.sh). Prefer dynamic `await import(...)` inside jsFunctions; `<script type="module">`
-  with bare specifiers also works in html when a module script genuinely belongs there.
+  esm.sh). jsFunctions/jsExpressions run with classic-script semantics — top-level await
+  is a SyntaxError there. Prefer dynamic `await import(...)` inside an async function
+  declared in jsFunctions (keep jsExpressions synchronous invocations);
+  `<script type="module">` with bare specifiers also works in html when a module script
+  genuinely belongs there.
 
 ---
 

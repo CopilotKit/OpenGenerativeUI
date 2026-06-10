@@ -14,19 +14,44 @@ const DESIGN_SYSTEM_STYLE_TAG = `<style>${DESIGN_SYSTEM_CSS}</style>`;
 const OVERFLOW_HIDDEN_STYLE_TAG =
   "<style>html, body { overflow: hidden !important; }</style>";
 
+// CSP for the final sandbox document, carried over from the legacy widget
+// renderer shell and matching the CDN allowlist documented in the
+// advanced-visualization skill ("CSP-enforced"). 'unsafe-inline' covers the
+// websandbox bootstrap and sandbox.run-injected scripts; script-src and
+// connect-src are restricted to the four CDN origins so generated code cannot
+// load from or exfiltrate to arbitrary origins.
+export const CSP_META_TAG = `<meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'unsafe-inline' 'unsafe-eval'
+      https://cdnjs.cloudflare.com
+      https://esm.sh
+      https://cdn.jsdelivr.net
+      https://unpkg.com;
+    style-src 'unsafe-inline';
+    img-src 'self' data: blob:;
+    font-src 'self' data:;
+    connect-src 'self'
+      https://cdnjs.cloudflare.com
+      https://esm.sh
+      https://cdn.jsdelivr.net
+      https://unpkg.com;
+  ">`;
+
 export function ensureHead(html: string): string {
   if (/<head[\s>]/i.test(html)) return html;
   return `<head></head>${html}`;
 }
 
 /**
- * Final sandbox document: importmap first (must precede any scripts so module
- * resolution works), then design-system styles, then the generated css, then
- * the generated html. Head content is injected right after the opening <head>
- * tag so it precedes anything the generated document put in its own head.
+ * Final sandbox document: CSP meta first, then importmap (must precede any
+ * scripts so module resolution works), then design-system styles, then the
+ * generated css, then the generated html. Head content is injected right
+ * after the opening <head> tag so it precedes anything the generated document
+ * put in its own head.
  */
 export function buildFinalFrameContent(html: string, css?: string): string {
   const headContent =
+    CSP_META_TAG +
     IMPORTMAP_SCRIPT_TAG +
     DESIGN_SYSTEM_STYLE_TAG +
     (css ? `<style>${css}</style>` : "");
@@ -56,14 +81,30 @@ export function buildPreviewHeadContent(
 /**
  * Preview body update: morph via Idiomorph (preserves existing nodes, no
  * flicker), falling back to a plain innerHTML assignment if Idiomorph is
- * unavailable or throws.
+ * unavailable or throws. New element nodes are tagged with morph-enter
+ * (legacy bridge parity) so the design system's fadeSlideIn animation plays
+ * as streamed content appears. (The #content.initial-render stagger rules in
+ * FORM_STYLES_WITH_STAGGER_CSS apply only to documents that wrap content in
+ * #content — i.e. the MCP rail — and are inert here.)
  */
 export function buildPreviewBodyMorph(body: string): string {
   return `(function() {
   var html = ${JSON.stringify(body)};
   if (typeof Idiomorph !== "undefined" && Idiomorph && Idiomorph.morph) {
     try {
-      Idiomorph.morph(document.body, html, { morphStyle: 'innerHTML' });
+      Idiomorph.morph(document.body, html, {
+        morphStyle: 'innerHTML',
+        callbacks: {
+          beforeNodeAdded: function(node) {
+            if (node.nodeType === 1) {
+              node.classList.add('morph-enter');
+              node.addEventListener('animationend', function() {
+                node.classList.remove('morph-enter');
+              }, { once: true });
+            }
+          }
+        }
+      });
     } catch (err) {
       document.body.innerHTML = html;
     }
