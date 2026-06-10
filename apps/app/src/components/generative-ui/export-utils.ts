@@ -1,4 +1,9 @@
-import { THEME_CSS, SVG_CLASSES_CSS, FORM_STYLES_CSS } from "./widget-renderer";
+import {
+  THEME_CSS,
+  SVG_CLASSES_CSS,
+  FORM_STYLES_WITH_STAGGER_CSS as FORM_STYLES_CSS,
+  IMPORTMAP_SCRIPT_TAG,
+} from "@repo/design-system";
 
 const CHART_COLORS = [
   "#3b82f6",
@@ -12,20 +17,7 @@ const CHART_COLORS = [
 
 // Import map matching widget-renderer's assembleShell — allows widgets that
 // use bare specifiers (e.g. `import * as THREE from "three"`) to work standalone.
-const IMPORT_MAP = `<script type="importmap">
-  {
-    "imports": {
-      "three": "https://esm.sh/three",
-      "three/": "https://esm.sh/three/",
-      "gsap": "https://esm.sh/gsap",
-      "gsap/": "https://esm.sh/gsap/",
-      "d3": "https://esm.sh/d3",
-      "d3/": "https://esm.sh/d3/",
-      "chart.js": "https://esm.sh/chart.js",
-      "chart.js/": "https://esm.sh/chart.js/"
-    }
-  }
-  </script>`;
+const IMPORT_MAP = IMPORTMAP_SCRIPT_TAG;
 
 /**
  * Wrap a raw HTML fragment (the same string passed to WidgetRenderer)

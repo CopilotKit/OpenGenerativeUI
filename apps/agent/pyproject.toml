@@ -17,3 +17,12 @@ dependencies = [
     "langchain-mcp-adapters>=0.2.1",
     "deepagents>=0.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
