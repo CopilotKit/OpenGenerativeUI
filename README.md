@@ -174,11 +174,11 @@ Next.js 16, React 19, Tailwind CSS 4, LangChain Deep Agents, LangGraph, CopilotK
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=CopilotKit%2FOpenGenerativeUI&type=date&legend=top-left">
+<a href="https://star-history.dera.page/#CopilotKit/OpenGenerativeUI&type=date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=CopilotKit/OpenGenerativeUI&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=CopilotKit/OpenGenerativeUI&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=CopilotKit/OpenGenerativeUI&type=date&legend=bottom-right" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://star-history.dera.page/svg?repos=CopilotKit/OpenGenerativeUI&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://star-history.dera.page/svg?repos=CopilotKit/OpenGenerativeUI&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://star-history.dera.page/svg?repos=CopilotKit/OpenGenerativeUI&type=date&legend=bottom-right" />
  </picture>
 </a>
 
